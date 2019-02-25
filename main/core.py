@@ -363,7 +363,7 @@ class PTMHandler:
         return result
 
     def shade_with_light_source(self, rgb_image: np.ndarray,
-                                angle, elevation: int):
+                                angle: int, elevation: int, cmap_fn=None):
         "Continue"
         # TODO matplotlib has a shading and light source algorithm
         # use their shade_rgb directly
@@ -372,7 +372,10 @@ class PTMHandler:
         grayim = cv2.cvtColor(rgb_image, cv2.COLOR_BGR2GRAY)
         light = Lsource(angle, elevation)
         # pdb.set_trace()
-        newimage = light.shade(data=grayim, cmap=plt.cm.hsv)
+        if cmap_fn is not None:
+            newimage = light.shade(data=grayim, cmap=cmap_fn)
+        else:
+            newimage = light.shade(data=grayim, cmap=plt.cm.hsv)
         shape = newimage.shape
         newimage = newimage.flatten()
         newimage = np.uint8(np.interp(newimage,
