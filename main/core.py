@@ -8,6 +8,7 @@ from matplotlib.colors import LightSource as Lsource
 import matplotlib.pyplot as plt
 import cv2
 
+
 class PTMFileParse:
     """
     Parse .ptm files according to
@@ -71,6 +72,149 @@ class PTMFileParse:
         out['image_height'] = self.image_height
         out['format'] = self.format
         return out
+
+
+def getDistancePoint2Array(apoint, coordarr):
+    "Get distance between point1 and point2"
+    yarr = coordarr[:, 0]  # row nb
+    xarr = coordarr[:, 1]  # col nb
+    xdist = (apoint.x - xarr)**2
+    ydist = (apoint.y - yarr)**2
+    return np.sqrt(xdist + ydist)
+
+
+def interpolateImage(imarr: np.ndarray):
+    "Interpolate image array"
+    imshape = imarr.shape
+    newimage = imarr.flatten()
+    newimage = np.uint8(np.interp(newimage,
+                                  (newimage.min(),
+                                   newimage.max()),
+                                  (0, 255))
+                        )
+    newimage = newimage.reshape(shape)
+    return newimage
+
+
+class LightSource:
+    "Simple implementation of a light source"
+
+    def __init__(self, x, y, z=None):
+        "light source"
+        self.x = x
+        self.y = y
+        if z is not None:
+            assert isinstance(z, float)
+            assert z > 0.0 and z < 1.0
+        self.radius = z
+        self.coords = [x, y, z]
+
+    def getDistance2Arr(self, arr):
+        "Get range of the light source"
+        arrshape = arr.shape
+        assert arrshape[1] == 2  # should be x,y array
+        return getDistancePoint2Array(apoint=self,
+                                      coordarr=arr)
+
+    def getNormDistance2Arr(self, image_row_nb: int,
+                            image_col_nb: int,
+                            norm_coordinates: np.ndarray):
+        normpoint = {'x': self.x / image_col_nb,
+                     'y': self.y / image_row_nb}
+        assert norm_coordinates.shape[1] == 2
+        return getDistancePoint2Array(apoint=normpoint,
+                                      coordarr=norm_coordinates)
+
+    def assignColor2Image(self, image: np.ndarray,
+                          coordarray: np.ndarray,
+                          factor: float):
+        """
+        Assign new colors to image using coordinate array
+
+        The main idea is to assign to the pixels specified in the
+        coordinate array a color that is indicated by the factor
+        """
+        image_factored = np.copy(image).astype(np.float32) * factor
+        newimage = np.zeros_like(image, dtype=np.float32)
+        newimage[coordarr[:, 0],
+                 coordarr[:, 1], :] = image_factored[coordarr[:, 0],
+                                                     coordarr[:, 1], :]
+        newimage = interpolateImage(newimage)
+        return newimage
+
+    def filterWithLightRange(self,
+                             image_colnb: int,
+                             image: np.ndarray,
+                             coordarr: np.ndarray):
+        "Filter from image coordinates that are not in light range"
+        distance = self.getDistance2Arr(coordarr)
+        inRangeCondition = self.z * image_colnb > distance
+        distanceMasked = np.where(inRangeCondition,
+                                  distance,  # can't be negative
+                                  -1)  # -1 to mark areas outside range
+        inrangeCoords = np.argwhere(distanceMasked != -1)
+        rowCoordinates = np.squeeze(inrangeCoords)
+        newcoordarr = coordarr[rowCoordinates, :]
+        return newcoordarr
+
+    def filterImageSharp(self, image_colnb,
+                         image, coordarr):
+        "Filter coords outside of light range sharply"
+        newcoordarr = self.filterWithLightRange(image_colnb,
+                                                image,
+                                                coordarr)
+        newimage = self.assignColor2Image(image=image,
+                                          coordarray=newcoordarr,
+                                          factor=1.0)
+        return newimage
+
+    def filterImageDistanceFactor(self, image_colnb,
+                                  image, coordarr):
+        "Filter coords outside of light range with a factor of distance"
+        newcoord = self.filterWithLightRange(image_colnb,
+                                             image, coordarr)
+
+
+
+
+class Shader:
+    "Shader regroups shading methods operating on pixels"
+
+    def __init__(self,
+                 image: np.ndarray):
+        assert isinstance(image, np.ndarray)
+        self.image = image
+
+    @property
+    def norm_coordinates(self):
+        "Get normalized coordinates of the image pixels"
+        rownb, colnb=self.image.shape[:2]
+        coords=[[(row, col) for col in range(colnb)] for row in range(rownb)]
+        coordarray=np.array(coords)
+        coordarray=coordarray.reshape((-1, 2))
+        coordarray[:, 0]=coordarray[:, 0] / rownb
+        coordarray[:, 1]=coordarray[:, 1] / colnb
+        return coordarray
+
+    @property
+    def norm_image(self):
+        "Get normalized image with pixel values divided by 255"
+        return self.image / 255.0
+
+    @property
+    def coordinates(self):
+        "Coordinates of the image pixels"
+        rownb, colnb=self.image.shape[:2]
+        coords=[[(row, col) for col in range(colnb)] for row in range(rownb)]
+        coordarray=np.array(coords)
+        return coordarray.reshape((-1, 2))
+
+    def shade(self,
+              fn: lambda x: x,
+              pixel) -> [int, int, int, int]:
+        "shade pixel using function"
+        newpixel = fn(pixel)
+        return newpixel
 
 
 class PTMHandler:
@@ -379,10 +523,10 @@ class PTMHandler:
         shape = newimage.shape
         newimage = newimage.flatten()
         newimage = np.uint8(np.interp(newimage,
-                                    (newimage.min(),
-                                     newimage.max()),
-                                    (0, 255))
-                          )
+                                      (newimage.min(),
+                                       newimage.max()),
+                                      (0, 255))
+                            )
         newimage = newimage.reshape(shape)
 
         return newimage
