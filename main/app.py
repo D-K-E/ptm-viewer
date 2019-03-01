@@ -415,6 +415,8 @@ class Viewer:
         "Get ptmpath and set up ptm handler"
         path = self.ptmfiles[ptmname]['path']
         self.handler = setUpHandler(path)
+        self.handler.image = self.handler.computeImage(np.copy(
+            self.handler.arr))
 
     def loadImage2Canvas(self, imarray):
         "Load handler image to canvas"

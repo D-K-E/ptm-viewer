@@ -22,16 +22,28 @@ class PTMFileParse:
             self.raw = [raw_line for raw_line in self.raw if raw_line]
         self.header = self.raw[0].decode('utf-8').strip()
         self.format = self.raw[1].decode('utf-8').strip()
-        self.image_width = int(self.raw[2].decode('utf-8').strip())
-        self.image_height = int(self.raw[3].decode('utf-8').strip())
-        self.scales = self.raw[4].decode('utf-8').strip().split()
-        self.scales = np.array([float(s) for s in self.scales], dtype=np.float)
-        self.biases = self.raw[5].decode('utf-8').strip().split()
-        self.biases = np.array([int(b) for b in self.biases], dtype=np.int32)
         if self.format != "PTM_FORMAT_RGB":
             raise ValueError('ptm format {0} not supported'.format(self.format)
                              )
 
+    @property
+    def image_width(self):
+        return int(self.raw[2].decode('utf-8').strip())
+
+    @property
+    def image_height(self):
+        return int(self.raw[3].decode('utf-8').strip())
+
+    @property
+    def scales(self):
+        scales = self.raw[4].decode('utf-8').strip().split()
+        return np.array([float(s) for s in scales], dtype=np.float32)
+
+    @property
+    def biases(self):
+        biases = self.raw[5].decode('utf-8').strip().split()
+        return np.array([int(b) for b in biases], dtype=np.int32)
+        
     def get_coeffarr(self):
         "Get coefficients array from bytelist"
         if self.format == "PTM_FORMAT_RGB":
@@ -83,17 +95,49 @@ def getDistancePoint2Array(apoint, coordarr):
     return np.sqrt(xdist + ydist)
 
 
-def interpolateImage(imarr: np.ndarray):
+class ImageArray:
+    "Image array have some additional properties besides np.ndarray"
+
+    def __init__(self, image: np.ndarray):
+        assert isinstance(image, np.ndarray)
+        self.image = image
+
+    @property
+    def norm_coordinates(self):
+        "Get normalized coordinates of the image pixels"
+        rownb, colnb = self.image.shape[:2]
+        coords = [[(row, col) for col in range(colnb)] for row in range(rownb)]
+        coordarray = np.array(coords)
+        coordarray = coordarray.reshape((-1, 2))
+        coordarray[:, 0] = coordarray[:, 0] / rownb
+        coordarray[:, 1] = coordarray[:, 1] / colnb
+        return coordarray
+
+    @property
+    def norm_image(self):
+        "Get normalized image with pixel values divided by 255"
+        return self.image / 255.0
+
+    @property
+    def coordinates(self):
+        "Coordinates of the image pixels"
+        rownb, colnb = self.image.shape[:2]
+        coords = [[(row, col) for col in range(colnb)] for row in range(rownb)]
+        coordarray = np.array(coords)
+        return coordarray.reshape((-1, 2))
+
+
+def interpolateImage(imarr: ImageArray):
     "Interpolate image array"
-    imshape = imarr.shape
-    newimage = imarr.flatten()
+    imshape = imarr.image.shape
+    newimage = imarr.image.flatten()
     newimage = np.uint8(np.interp(newimage,
                                   (newimage.min(),
                                    newimage.max()),
                                   (0, 255))
                         )
-    newimage = newimage.reshape(shape)
-    return newimage
+    newimage = newimage.reshape(imshape)
+    return ImageArray(newimage)
 
 
 class LightSource:
@@ -125,15 +169,26 @@ class LightSource:
         return getDistancePoint2Array(apoint=normpoint,
                                       coordarr=norm_coordinates)
 
-    def assignColor2Image(self, image: np.ndarray,
-                          coordarray: np.ndarray,
-                          factor: float):
+
+class Shader:
+    "Shader regroups shading methods operating on pixels"
+
+    def __init__(self, image: np.ndarray,
+                 light_source: LightSource):
+        assert isinstance(image, np.ndarray)
+        self.image = ImageArray(image)
+        self.light_source = light_source
+
+    def assignColor2Image(self,
+                          factor: float,
+                          coordarr):
         """
         Assign new colors to image using coordinate array
 
         The main idea is to assign to the pixels specified in the
         coordinate array a color that is indicated by the factor
         """
+        image = self.image.image
         image_factored = np.copy(image).astype(np.float32) * factor
         newimage = np.zeros_like(image, dtype=np.float32)
         newimage[coordarr[:, 0],
@@ -142,13 +197,13 @@ class LightSource:
         newimage = interpolateImage(newimage)
         return newimage
 
-    def filterWithLightRange(self,
-                             image_colnb: int,
-                             image: np.ndarray,
-                             coordarr: np.ndarray):
+    def filterWithLightRange(self):
         "Filter from image coordinates that are not in light range"
+        image = self.image.image
+        coordarr = self.image.coordinates
+        image_colnb = image.shape[1]
         distance = self.getDistance2Arr(coordarr)
-        inRangeCondition = self.z * image_colnb > distance
+        inRangeCondition = self.light_source.z * image_colnb > distance
         distanceMasked = np.where(inRangeCondition,
                                   distance,  # can't be negative
                                   -1)  # -1 to mark areas outside range
@@ -157,57 +212,30 @@ class LightSource:
         newcoordarr = coordarr[rowCoordinates, :]
         return newcoordarr
 
-    def filterImageSharp(self, image_colnb,
-                         image, coordarr):
+    def filterImageSharp(self):
         "Filter coords outside of light range sharply"
+        image = self.image.image
+        coordarr = self.image.coordinates
+        image_colnb = image.shape[1]
         newcoordarr = self.filterWithLightRange(image_colnb,
                                                 image,
                                                 coordarr)
-        newimage = self.assignColor2Image(image=image,
-                                          coordarray=newcoordarr,
+        newimage = self.assignColor2Image(coordarray=newcoordarr,
                                           factor=1.0)
         return newimage
 
-    def filterImageDistanceFactor(self, image_colnb,
-                                  image, coordarr):
+    def filterImageDistanceFactor(self):
         "Filter coords outside of light range with a factor of distance"
-        newcoord = self.filterWithLightRange(image_colnb,
-                                             image, coordarr)
-
-
-
-
-class Shader:
-    "Shader regroups shading methods operating on pixels"
-
-    def __init__(self,
-                 image: np.ndarray):
-        assert isinstance(image, np.ndarray)
-        self.image = image
-
-    @property
-    def norm_coordinates(self):
-        "Get normalized coordinates of the image pixels"
-        rownb, colnb=self.image.shape[:2]
-        coords=[[(row, col) for col in range(colnb)] for row in range(rownb)]
-        coordarray=np.array(coords)
-        coordarray=coordarray.reshape((-1, 2))
-        coordarray[:, 0]=coordarray[:, 0] / rownb
-        coordarray[:, 1]=coordarray[:, 1] / colnb
-        return coordarray
-
-    @property
-    def norm_image(self):
-        "Get normalized image with pixel values divided by 255"
-        return self.image / 255.0
-
-    @property
-    def coordinates(self):
-        "Coordinates of the image pixels"
-        rownb, colnb=self.image.shape[:2]
-        coords=[[(row, col) for col in range(colnb)] for row in range(rownb)]
-        coordarray=np.array(coords)
-        return coordarray.reshape((-1, 2))
+        coordarr = self.image.coordinates
+        image_colnb = self.image.image.shape[1]
+        distance = self.light_source.getDistance2Arr(arr=coordarr)
+        factor = self.light_source.z * image_colnb
+        factor = distance / factor
+        factor = 1 - factor
+        newcoord = self.filterWithLightRange()
+        newimage = self.assignColor2Image(factor=factor,
+                                          coordarr=newcoord)
+        return newimage
 
     def shade(self,
               fn: lambda x: x,
@@ -314,30 +342,21 @@ class PTMHandler:
                           luvec,
                           lvvec,
                           np.ones_like(lvvec)], dtype=np.float)
-        return np.transpose(l_mat, (1, 0))
+        return l_mat.T
 
-    def get_light_direction_vector(self, coeffarr: np.ndarray):
+    def get_light_direction_matrix(self, coeffarr: np.ndarray):
         "Set light direction vector from coeffarr"
         luvec = self.get_light_dirU_vec(coeffarr)
         lvvec = self.get_light_dirV_vec(coeffarr)
         return self.form_light_direction_mat(luvec, lvvec)
 
-    def get_luminance(self, coeffarr):
-        "get luminance from coeffarr to have images"
-        light_mat = self.get_light_direction_vector(coeffarr)
-        flatim = np.sum(coeffarr * light_mat, dtype=np.uint32, axis=1)
-        flatim = np.squeeze(flatim)
-        # interpolate the range into 0 - 255
-        flatim = np.uint8(np.interp(flatim,
-                                    (flatim.min(),
-                                     flatim.max()),
-                                    (0, 255))
-                          )
-        return flatim
-
-    def set_luminance(self, coeffarr):
-        "Set L value from coeffarr"
-        self.L = self.get_luminance(coeffarr)
+    def get_channel_intensity(self, channel_coeffarr: np.ndarray):
+        "Get channel intensity given channel coefficient array"
+        arr = channel_coeffarr.reshape((-1, 6))
+        light_dir_mat = self.get_light_direction_matrix(arr)
+        intensity = np.sum(arr * light_dir_mat, axis=1, dtype=np.float32)
+        return np.squeeze(intensity.reshape((self.imheight,
+                                             self.imwidth, -1)))
 
     def form_surface_normal(self, luvec,
                             lvvec):
@@ -394,12 +413,19 @@ class PTMHandler:
 
     def computeImage(self, coeffarr):
         "Compute image from coefficient array"
-        flatim = self.get_luminance(coeffarr)
-        image = flatim.reshape((self.imheight,
-                                self.imwidth,
-                                3))
-
-        return image
+        imcoeffarr = coeffarr.reshape((3, 
+                                       self.imheight * self.imwidth,
+                                       6))
+        image = np.zeros((self.imheight, self.imwidth, 3), dtype=np.float32)
+        redchannel = self.get_channel_intensity(imcoeffarr[0, :, :])
+        greenchannel = self.get_channel_intensity(imcoeffarr[1, :, :])
+        bluechannel = self.get_channel_intensity(imcoeffarr[2, :, :])
+        image[:, :, 0] = redchannel
+        image[:, :, 1] = greenchannel
+        image[:, :, 2] = bluechannel
+        imarr = ImageArray(image)
+        img = interpolateImage(imarr)
+        return img.image
 
     def change_diffuse_gain(self, g: float,
                             coeffarr: np.ndarray):
@@ -560,5 +586,5 @@ def setUpHandler(ptmpath: str):
         image_width=out['image_width'],
         scales=out['scales'],
         biases=out['biases'])
-    handler.setUp()
+    # handler.setUp()
     return handler
