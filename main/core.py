@@ -264,12 +264,6 @@ class PTMHandler:
         self.biases = biases
         self.imheight = image_height
         self.imwidth = image_width
-        self.light_dirV_vec = None
-        self.light_dirU_vec = None
-        self.light_mat = None
-        self.L = None
-        self.surface_normal = None
-        self.image = None
         # light source angle and direction
         self.light_source = Lsource(azdeg=azdeg, altdeg=altdeg)
         # see compute shading for variable names
@@ -289,6 +283,122 @@ class PTMHandler:
         # see change diffuse gain for variable name
         self.g = 0.4
 
+    @property
+    def imcoeffarr(self):
+        "Image coefficients array"
+        return self.arr.reshape((3,
+                                 self.imheight * self.imwidth,
+                                 6))
+
+    @property
+    def red_channel_coefficients(self):
+        "Red channel coefficients array"
+        return self.imcoeffarr[0, :, :]
+
+    @property
+    def green_channel_coefficients(self):
+        "Green channel coefficients array"
+        return self.imcoeffarr[1, :, :]
+
+    @property
+    def blue_channel_coefficients(self):
+        "Blue channel coefficients array"
+        return self.imcoeffarr[2, :, :]
+
+    @property
+    def red_light_dirU_vec(self):
+        "Red light direction u vector"
+        return self.get_light_dirU_vec(self.red_channel_coefficients)
+
+    @property
+    def red_light_dirV_vec(self):
+        "Red light direction v vector"
+        return self.get_light_dirV_vec(self.red_channel_coefficients)
+
+    @property
+    def red_channel_surface_normal(self):
+        "Red channel surface normal"
+        return self.form_surface_normal(self.red_light_dirU_vec,
+                                        self.red_light_dirV_vec)
+
+    @property
+    def red_channel_normalized_surface_normal(self):
+        "Red channel normalized surface normal using vector norm of axes"
+        return self.normalize_surface_normal(self.red_channel_surface_normal)
+
+    @property
+    def red_channel_pixel_values(self):
+        "Get red channel pixel values"
+        return self.get_channel_intensity(self.red_channel_coefficients)
+
+    @property
+    def green_light_dirU_vec(self):
+        "Green light direction u vector"
+        return self.get_light_dirU_vec(self.green_channel_coefficients)
+
+    @property
+    def green_light_dirV_vec(self):
+        "Green light direction v vector"
+        return self.get_light_dirV_vec(self.green_channel_coefficients)
+
+    @property
+    def green_channel_surface_normal(self):
+        "Green channel surface normal"
+        return self.form_surface_normal(self.green_light_dirU_vec,
+                                        self.green_light_dirV_vec)
+
+    @property
+    def green_channel_normalized_surface_normal(self):
+        "Green channel normalized surface normal using vector norm of axes"
+        return self.normalize_surface_normal(self.green_channel_surface_normal)
+        
+    @property
+    def green_channel_pixel_values(self):
+        "Get green channel pixel values"
+        return self.get_channel_intensity(self.green_channel_coefficients)
+
+    @property
+    def blue_light_dirU_vec(self):
+        "Blue light direction u vector"
+        return self.get_light_dirU_vec(self.blue_channel_coefficients)
+
+    @property
+    def blue_light_dirV_vec(self):
+        "Blue light direction v vector"
+        return self.get_light_dirV_vec(self.blue_channel_coefficients)
+
+    @property
+    def blue_channel_surface_normal(self):
+        "Green channel surface normal"
+        return self.form_surface_normal(self.blue_light_dirU_vec,
+                                        self.blue_light_dirV_vec)
+
+    @property
+    def blue_channel_normalized_surface_normal(self):
+        "Red channel normalized surface normal using vector norm of axes"
+        return self.normalize_surface_normal(self.blue_channel_surface_normal)
+
+    @property
+    def blue_channel_pixel_values(self):
+        "Get blue channel pixel values"
+        return self.get_channel_intensity(self.blue_channel_coefficients)
+
+    @property
+    def imarr(self):
+        "Get image array"
+        image = np.zeros((self.imheight, self.imwidth, 3), dtype=np.float32)
+        image[:, :, 0] = self.red_channel_pixel_values
+        image[:, :, 1] = self.green_channel_pixel_values
+        image[:, :, 2] = self.blue_channel_pixel_values
+        imarr = ImageArray(image)
+        imarr = interpolateImage(imarr)
+        return imarr
+
+    @property
+    def image(self):
+        "Get image"
+        return self.imarr.image
+
     def get_light_dirU_vec(self, coeffarr: np.ndarray):
         """
         Get light direction U vector using formula:
@@ -306,10 +416,6 @@ class PTMHandler:
         newcoeffarr = nomin / denomin
         return newcoeffarr
 
-    def set_light_dirU_vec(self, coeffarr: np.ndarray):
-        "Set light direction U vector from coeffarr"
-        self.light_dirU_vec = self.get_light_dirU_vec(coeffarr)
-
     def get_light_dirV_vec(self, coeffarr: np.ndarray):
         """
         Get light direction U vector using formula:
@@ -325,14 +431,6 @@ class PTMHandler:
         ) - (coeffarr[:, 2]**2)
         newcoeffarr = nomin / denomin
         return newcoeffarr
-
-    def set_light_dirV_vec(self, coeffarr):
-        "Set light direction v vector from coeffarr"
-        self.light_dirV_vec = self.get_light_dirV_vec(coeffarr)
-
-    def set_light_direction_vec(self, coeffarr):
-        "Set light vector with computed values for v and u"
-        self.light_mat = self.get_light_direction_vector(coeffarr)
 
     def form_light_direction_mat(self, luvec, lvvec):
         "Form the light direction matrice"
@@ -368,7 +466,6 @@ class PTMHandler:
              ],
             dtype=np.float)
         return np.transpose(normal, (1, 0))
-        # return normal
 
     def get_surface_normal(self, coeffarr):
         """
@@ -378,54 +475,29 @@ class PTMHandler:
         lvvec = self.get_light_dirV_vec(coeffarr)
         return self.form_surface_normal(luvec, lvvec)
 
-    def set_surface_normal(self, coeffarr):
-        "Surface normal"
-        luvec = self.light_dirU_vec
-        lvvec = self.light_dirV_vec
-        self.surface_normal = self.form_surface_normal(luvec, lvvec)
+    def normalize_surface_normal(self, surface_normal):
+        "Normalize a given surface normal"
+        ax1 = surface_normal[:, 0]
+        ax2 = surface_normal[:, 1]
+        ax3 = surface_normal[:, 2]
+        normalized = np.zeros_like(surface_normal, dtype=np.float32)
+        ax1norm = ax1 / np.linalg.norm(ax1)
+        ax2norm = ax2 / np.linalg.norm(ax2)
+        ax3norm = ax3 / np.linalg.norm(ax3)
+        normalized[:, 0] = ax1norm
+        normalized[:, 1] = ax2norm
+        normalized[:, 2] = ax3norm
+        return normalized
 
-    def set_halfway_vector(self):
-        "Set halfway vector H using normal and light vec"
-        self.halfway_vec = (
-            (self.surface_normal + self.light_mat) /
-            (self.surface_normal)  # TODO continue the formula p. 731
-        )
-
-    def set_light(self, coeffarr):
-        "Set light direction vectors and matrices"
-        self.set_light_dirU_vec(coeffarr)
-        self.set_light_dirV_vec(coeffarr)
-        self.light_mat = self.form_light_direction_mat(self.light_dirU_vec,
-                                                       self.light_dirV_vec)
-
-    def set_image(self, coeffarr):
-        "Set image from coeffarr"
-        self.set_light(coeffarr)
-        self.set_luminance(coeffarr)
-        self.image = self.L.reshape((self.imheight,
-                                     self.imwidth,
-                                     3))
-
-    def setUp(self):
-        "Setup handler from given coefficient array"
-        self.set_image(coeffarr=self.arr)
-        self.set_surface_normal(self.arr)
-
-    def computeImage(self, coeffarr):
-        "Compute image from coefficient array"
-        imcoeffarr = coeffarr.reshape((3, 
-                                       self.imheight * self.imwidth,
-                                       6))
-        image = np.zeros((self.imheight, self.imwidth, 3), dtype=np.float32)
-        redchannel = self.get_channel_intensity(imcoeffarr[0, :, :])
-        greenchannel = self.get_channel_intensity(imcoeffarr[1, :, :])
-        bluechannel = self.get_channel_intensity(imcoeffarr[2, :, :])
-        image[:, :, 0] = redchannel
-        image[:, :, 1] = greenchannel
-        image[:, :, 2] = bluechannel
-        imarr = ImageArray(image)
-        img = interpolateImage(imarr)
-        return img.image
+    def get_light_matrix(self, light_source: LightSource):
+        "Get light vector from light source"
+        coordarr = self.imarr.coordinates
+        xarr = coordarr[:, 0]
+        yarr = coordarr[:, 1]
+        xdiff = light_source.x - xarr
+        ydiff = light_source.y - yarr
+        zval = light_source.z
+        # TODO continue implementing light vector for dot product
 
     def change_diffuse_gain(self, g: float,
                             coeffarr: np.ndarray):
@@ -556,25 +628,6 @@ class PTMHandler:
         newimage = newimage.reshape(shape)
 
         return newimage
-
-    def render_shading(self, coeffarr: np.ndarray):
-        "Render shaded coeffarr"
-        flatim = self.compute_shading(coeffarr)
-        flatim = np.uint8(np.interp(flatim,
-                                    (flatim.min(),
-                                     flatim.max()),
-                                    (0, 255))
-                          )
-        image = flatim.reshape((self.imheight, self.imwidth, 3))
-
-        return image
-
-    def render_coeffarr(self, coeffarr: np.ndarray):
-        "Render coefficient array with values in class"
-        newarr = self.change_diffuse_gain(self.g, coeffarr)
-        shaded = self.compute_shading(newarr)
-        return shaded  # should return an image instead TODO
-
 
 def setUpHandler(ptmpath: str):
     "From parse ptm file from path and setup ptm handler"
