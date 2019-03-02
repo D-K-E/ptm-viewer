@@ -3,11 +3,10 @@
 # license: see, LICENSE
 # No Warranties, use at your own risk, see LICENSE
 
-from core import PTMFileParse, PTMHandler
+from core import PTMFileParse, PTMHandler, LightSource
 from core import setUpHandler
 
 import tkinter
-import matplotlib.pyplot as plt
 from tkinter import ttk
 from tkinter import filedialog
 from tkinter import messagebox
@@ -23,15 +22,6 @@ class Viewer:
 
     def __init__(self):
         "Viewer gui app"
-
-        self.cmaps = {
-            'hsv': plt.cm.hsv,
-            'red-yellow-blue': plt.cm.RdYlBu,
-            'red-yellow-green': plt.cm.RdYlGn,
-            'spectral': plt.cm.Spectral,
-            'viridis': plt.cm.viridis,
-            'greys': plt.cm.Greys,
-            'rainbow': plt.cm.rainbow}
 
         self.ptmfiles = {}
         self.handler = None
@@ -65,15 +55,27 @@ class Viewer:
         self.canvas = None
         self.canvasScrollx = None
         self.canvasScrolly = None
+        #
         self.controlFrame = None
+        #
         self.diffFrame = None
         self.diffGainSpin = None
-        self.cmapFrame = None
-        self.cmapComboBox = None
-        self.lightAngleFrame = None
-        self.lightAngleSpin = None
-        self.lightPosFrame = None
-        self.lightPosSpin = None
+        self.shaderFrame = None
+        self.shaderComboBox = None
+        #
+        self.ambientTermFrame = None
+        self.ambientTermSpin = None
+        #
+        self.lightOptionsFrame = None
+        #
+        self.lightPosXFrame = None
+        self.lightPosXSpin = None
+        self.lightPosYFrame = None
+        self.lightPosYSpin = None
+        self.lightRadiusFrame = None
+        self.lightRadiusSpin = None
+        self.lightIntensityFrame = None
+        self.lightIntensitySpin = None
 
     def createMainWindow(self):
         "Create the main application window"
@@ -230,7 +232,7 @@ class Viewer:
                            yscrollcommand=self.canvasScrolly.set)
 
         self.canvasScrolly.grid(row=0,
-                                column=3,
+                                column=4,
                                 sticky=tkinter.E)
 
         self.canvasScrollx.grid(row=1,
@@ -242,13 +244,14 @@ class Viewer:
         self.mainWindow.columnconfigure(2, weight=2)
         self.mainWindow.rowconfigure(0, weight=1)
 
+    # Options related
     def createControlFrame(self):
         "create control frame"
         self.controlFrame = tkinter.LabelFrame(
             master=self.mainWindow,
             text='Controls')
         self.controlFrame.grid(column=2,
-                               columnspan=1,
+                               columnspan=4,
                                row=2,
                                rowspan=4)
         self.mainWindow.grid_columnconfigure(2, weight=1)
@@ -261,7 +264,7 @@ class Viewer:
             text='Diffusion Gain Value',
             font=self.labelFont
         )
-        self.diffFrame.grid(column=2,
+        self.diffFrame.grid(column=4,
                             row=1,
                             in_=self.controlFrame,
                             ipadx=2,
@@ -275,79 +278,139 @@ class Viewer:
             to=10.0,
             increment=0.03)
         self.diffGainSpin.grid(
-            column=2,
+            column=4,
             in_=self.diffFrame,
             row=1)
 
-    def createCmapFrame(self):
-        "create colormap frame"
-        self.cmapFrame = tkinter.LabelFrame(
+    def createShaderFrame(self):
+        "create shader frame"
+        self.shaderFrame = tkinter.LabelFrame(
             master=self.controlFrame,
-            text='Colormaps',
+            text='Shaders',
             font=self.labelFont
         )
-        self.cmapFrame.grid(
+        self.shaderFrame.grid(
             column=3,
             row=1,
-            in_=self.controlFrame,
             ipadx=1,
             padx=1)
 
-    def createCmapComboBox(self):
+    def createShaderComboBox(self):
         "create colormap combobox"
-        self.cmapComboBox = ttk.Combobox(
-            master=self.cmapFrame,
-            values=list(self.cmaps.keys())
+        self.shaderComboBox = ttk.Combobox(
+            master=self.shaderFrame,
+            values=['cell', 'phong']
         )
-        self.cmapComboBox.grid(column=2,
-                               in_=self.cmapFrame,
-                               row=2)
+        self.shaderComboBox.grid(column=2,
+                                 in_=self.shaderFrame,
+                                 row=2)
 
-    def createLightAngleFrame(self):
+    def createAmbientTermFrame(self):
+        "Ambient term container"
+        self.ambientTermFrame = tkinter.LabelFrame(
+            master=self.controlFrame,
+            text="Ambient Term",
+            font=self.labelFont)
+        self.ambientTermFrame.grid(column=3,
+                                   row=0)
+
+    def createAmbientTermSpin(self):
+        "Ambient term"
+        self.ambientTermSpin = tkinter.Spinbox(
+            master=self.ambientTermFrame,
+            from_=0.00,
+            to=0.99,
+            increment=0.01)
+        self.ambientTermSpin.grid(column=3,
+                                  row=0)
+
+    def createLightOptionsFrame(self):
+        "Regroups the light options"
+        self.lightOptionsFrame = tkinter.LabelFrame(
+            master=self.controlFrame,
+            text="Light Controls",
+            font=self.labelFont)
+        self.lightOptionsFrame.grid(column=2,
+                                    rowspan=2,
+                                    row=0)
+
+    def createLightPosXFrame(self):
         "Create light angle frame"
-        self.lightAngleFrame = tkinter.LabelFrame(
-            master=self.controlFrame,
-            text='Angle of Altitude',
+        self.lightPosXFrame = tkinter.LabelFrame(
+            master=self.lightOptionsFrame,
+            text='Light Position X val',
             font=self.labelFont
         )
-        self.lightAngleFrame.grid(column=0,
-                                  row=1,
-                                  ipadx=15,
-                                  )
+        self.lightPosXFrame.grid(column=0,
+                                 row=0,
+                                 )
 
-    def createLightAngleSpin(self):
+    def createLightPosXSpin(self):
         "Create altitude angle spinbox"
-        self.lightAngleSpin = tkinter.Spinbox(
-            master=self.lightAngleFrame,
-            from_=1,
+        self.lightPosXSpin = tkinter.Spinbox(
+            master=self.lightPosXFrame,
             increment=1,
-            to=90)
-        self.lightAngleSpin.grid(column=0,
-                                 row=0)
+        )
+        self.lightPosXSpin.grid(column=0,
+                                row=0)
 
-    def createLightPosFrame(self):
+    def createLightPosYFrame(self):
         "Create light position frame"
-        self.lightPosFrame = tkinter.LabelFrame(
-            master=self.controlFrame,
-            text='Light Position',
+        self.lightPosYFrame = tkinter.LabelFrame(
+            master=self.lightOptionsFrame,
+            text='Light Position Y val',
             font=self.labelFont
         )
-        self.lightPosFrame.grid(column=1,
-                                row=1,
-                                in_=self.controlFrame,
-                                ipadx=19)
+        self.lightPosYFrame.grid(column=1,
+                                 row=0,
+                                 )
 
-    def createLightPosSpin(self):
+    def createLightPosYSpin(self):
         "Create light pos spin"
-        self.lightPosSpin = tkinter.Spinbox(
-            master=self.lightPosFrame,
-            from_=1,
-            to=360,
+        self.lightPosYSpin = tkinter.Spinbox(
+            master=self.lightPosYFrame,
             increment=1)
-        self.lightPosSpin.grid(column=0,
-                               in_=self.lightPosFrame,
-                               row=0
-                               )
+        self.lightPosYSpin.grid(column=1,
+                                row=0
+                                )
+
+    def createLightRadiusFrame(self):
+        "Create light radius frame"
+        self.lightRadiusFrame = tkinter.LabelFrame(
+            master=self.lightOptionsFrame,
+            text="Light Radius",
+            font=self.labelFont)
+        self.lightRadiusFrame.grid(column=0,
+                                   row=1)
+
+    def createLightRadiusSpin(self):
+        "light radius spin inside light radius frame"
+        self.lightRadiusSpin = tkinter.Spinbox(
+            master=self.lightRadiusFrame,
+            from_=1.0,
+            to=100.0,
+            increment=1)
+        self.lightRadiusSpin.grid(column=0,
+                                  row=1)
+
+    def createLightIntensityFrame(self):
+        "Light intensity that goes inside the illumination equation container"
+        self.lightIntensityFrame = tkinter.LabelFrame(
+            master=self.lightOptionsFrame,
+            text="Light Intensity",
+            font=self.labelFont)
+        self.lightIntensityFrame.grid(column=1,
+                                      row=1)
+
+    def createLightIntensitySpin(self):
+        "Light intensity spin box"
+        self.lightIntensitySpin = tkinter.Spinbox(
+            master=self.lightIntensityFrame,
+            from_=0.1,
+            to=20.0,
+            increment=0.1)
+        self.lightIntensitySpin.grid(column=1,
+                                     row=1)
 
     def createWidgets(self):
         "Create widgets in their proper layout"
@@ -360,15 +423,27 @@ class Viewer:
         self.createCanvas()
         self.createRenderBtn()
         self.createQuitBtn()
+        # Control
         self.createControlFrame()
+        # Ambient term
+        self.createAmbientTermFrame()
+        self.createAmbientTermSpin()
+        # Diffusion gain
         self.createDiffFrame()
         self.createDiffGainSpin()
-        self.createCmapFrame()
-        self.createCmapComboBox()
-        self.createLightAngleFrame()
-        self.createLightAngleSpin()
-        self.createLightPosFrame()
-        self.createLightPosSpin()
+        # Shader
+        self.createShaderFrame()
+        self.createShaderComboBox()
+        # light options
+        self.createLightOptionsFrame()
+        self.createLightPosXFrame()
+        self.createLightPosXSpin()
+        self.createLightPosYFrame()
+        self.createLightPosYSpin()
+        self.createLightRadiusFrame()
+        self.createLightRadiusSpin()
+        self.createLightIntensityFrame()
+        self.createLightIntensitySpin()
 
     # App logic
 
@@ -414,9 +489,8 @@ class Viewer:
     def set_handler(self, ptmname: str):
         "Get ptmpath and set up ptm handler"
         path = self.ptmfiles[ptmname]['path']
-        self.handler = setUpHandler(path)
-        self.handler.image = self.handler.computeImage(np.copy(
-            self.handler.arr))
+        self.handler_original = setUpHandler(path)
+        self.handler = self.handler_original.copy()
 
     def loadImage2Canvas(self, imarray):
         "Load handler image to canvas"
@@ -429,6 +503,8 @@ class Viewer:
         self.canvas.config(scrollregion=(0, 0,
                                          self.pilimg.width,
                                          self.pilimg.height))
+        self.lightPosYSpin.config(from_=1, to=self.pilimg.width - 1)
+        self.lightPosXSpin.config(from_=1, to=self.pilimg.height - 1)
         self.image_id = self.canvas.create_image(
             0,
             0,
@@ -438,23 +514,23 @@ class Viewer:
 
     def getRenderValues(self):
         "Get values to render the image"
-        light_position = self.lightPosSpin.get()
-        light_angle = self.lightAngleSpin.get()
-        diffusion_gain = self.diffGainSpin.get()
-        cmap_index = self.cmapComboBox.get()
-        cmap_fn = self.cmaps[cmap_index]
-        light_position = int(light_position)
-        light_angle = int(light_angle)
-        diffusion_gain = float(diffusion_gain)
-        coeffarr = np.copy(self.handler.arr)
-        self.handler.g = diffusion_gain
-        newim = self.handler.render_diffuse_gain(coeffarr)
-        newim = self.handler.shade_with_light_source(
-            rgb_image=newim,
-            angle=light_position,
-            elevation=light_angle,
-            cmap_fn=cmap_fn)
-        return newim
+        self.handler = self.handler_original.copy()
+        light_source_x = self.lightPosXSpin.get()
+        light_source_y = self.lightPosYSpin.get()
+        light_source_z = self.lightRadiusSpin.get()
+        # diffusion_gain = self.diffGainSpin.get()
+        light_source_x = int(light_source_x)
+        light_source_y = int(light_source_y)
+        light_source_z = float(light_source_z)
+        lsource = LightSource(x=light_source_x,
+                              y=light_source_y,
+                              z=light_source_z)
+        ambient_term = float(self.ambientTermSpin.get())
+        light_intensity = float(self.lightIntensitySpin.get())
+        image = self.handler.shade_image(light_source=lsource,
+                                         ambient_term=ambient_term,
+                                         light_intensity=light_intensity)
+        return image
 
     def renderImage(self):
         "render image with controller values"
@@ -463,9 +539,7 @@ class Viewer:
 
     def resetRendering(self):
         "reset rendering values"
-        coeffarr = np.copy(self.handler.arr)
-        imarr = self.handler.computeImage(coeffarr)
-        self.loadImage2Canvas(imarr)
+        self.loadImage2Canvas(self.handler_original.image)
 
     def load2Canvas(self):
         "Handle image loading event"

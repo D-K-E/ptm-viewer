@@ -3,10 +3,66 @@
 # No Warranties, use at your own risk, see LICENSE
 
 import numpy as np
+# import cupy as np
 import pdb
 from matplotlib.colors import LightSource as Lsource
 import matplotlib.pyplot as plt
 import cv2
+
+# from stack overflow
+# https://stackoverflow.com/a/21096605/7330813
+
+
+def _block_slices(dim_size, block_size):
+    """Generator that yields slice objects for indexing into 
+    sequential blocks of an array along a particular axis
+    """
+    count = 0
+    while True:
+        yield slice(count, count + block_size, 1)
+        count += block_size
+        if count > dim_size:
+            raise StopIteration
+
+
+def blockwise_dot(A, B, max_elements=int(2**27), out=None):
+    """
+    Computes the dot product of two matrices in a block-wise fashion. 
+    Only blocks of `A` with a maximum size of `max_elements` will be 
+    processed simultaneously.
+    """
+
+    m,  n = A.shape
+    n1, o = B.shape
+
+    if n1 != n:
+        raise ValueError('matrices are not aligned')
+
+    if A.flags.f_contiguous:
+        # prioritize processing as many columns of A as possible
+        max_cols = max(1, max_elements / m)
+        max_rows = max_elements / max_cols
+
+    else:
+        # prioritize processing as many rows of A as possible
+        max_rows = max(1, max_elements / n)
+        max_cols = max_elements / max_rows
+
+    if out is None:
+        out = np.empty((m, o), dtype=np.result_type(A, B))
+    elif out.shape != (m, o):
+        raise ValueError('output array has incorrect dimensions')
+
+    for mm in _block_slices(m, max_rows):
+        out[mm, :] = 0
+        for nn in _block_slices(n, max_cols):
+            A_block = A[mm, nn].copy()  # copy to force a read
+            out[mm, :] += np.dot(A_block, B[nn, :])
+            del A_block
+
+    return out
+
+# end stack overflow
 
 
 class PTMFileParse:
@@ -43,7 +99,7 @@ class PTMFileParse:
     def biases(self):
         biases = self.raw[5].decode('utf-8').strip().split()
         return np.array([int(b) for b in biases], dtype=np.int32)
-        
+
     def get_coeffarr(self):
         "Get coefficients array from bytelist"
         if self.format == "PTM_FORMAT_RGB":
@@ -126,6 +182,16 @@ class ImageArray:
         coordarray = np.array(coords)
         return coordarray.reshape((-1, 2))
 
+    @property
+    def arrshape(self):
+        "get array shape"
+        return self.image.shape
+
+    @property
+    def flatarr(self):
+        "get flattened array"
+        return self.image.flatten()
+
 
 def interpolateImage(imarr: ImageArray):
     "Interpolate image array"
@@ -149,8 +215,7 @@ class LightSource:
         self.y = y
         if z is not None:
             assert isinstance(z, float)
-            assert z > 0.0 and z < 1.0
-        self.radius = z
+        self.z = z
         self.coords = [x, y, z]
 
     def getDistance2Arr(self, arr):
@@ -265,21 +330,7 @@ class PTMHandler:
         self.imheight = image_height
         self.imwidth = image_width
         # light source angle and direction
-        self.light_source = Lsource(azdeg=azdeg, altdeg=altdeg)
-        # see compute shading for variable names
-        self.Ia = 1.0
-        self.ka = 0.2
-        self.c1 = 2
-        self.c2 = 2
-        self.c3 = 2
-        self.dL = 4
-        self.Ip = 1.0
-        self.kd = 0.45
-        self.od = 1
-        self.ks = 0.40
-        self.Os = 1
-        self.n = 3.0
-
+        
         # see change diffuse gain for variable name
         self.g = 0.4
 
@@ -351,7 +402,7 @@ class PTMHandler:
     def green_channel_normalized_surface_normal(self):
         "Green channel normalized surface normal using vector norm of axes"
         return self.normalize_surface_normal(self.green_channel_surface_normal)
-        
+
     @property
     def green_channel_pixel_values(self):
         "Get green channel pixel values"
@@ -390,6 +441,7 @@ class PTMHandler:
         image[:, :, 0] = self.red_channel_pixel_values
         image[:, :, 1] = self.green_channel_pixel_values
         image[:, :, 2] = self.blue_channel_pixel_values
+        # image = np.fliplr(image)  # flip image in column wise
         imarr = ImageArray(image)
         imarr = interpolateImage(imarr)
         return imarr
@@ -397,7 +449,21 @@ class PTMHandler:
     @property
     def image(self):
         "Get image"
-        return self.imarr.image
+        return np.fliplr(self.imarr.image)
+
+    def copy(self):
+        "copy self"
+        coeffarr = np.copy(self.arr)
+        scales = np.copy(self.scales)
+        biases = np.copy(self.biases)
+        imwidth = self.imwidth
+        imheight = self.imheight
+        newHandler = PTMHandler(coeffarr,
+                                imheight,
+                                imwidth,
+                                scales,
+                                biases)
+        return newHandler
 
     def get_light_dirU_vec(self, coeffarr: np.ndarray):
         """
@@ -453,8 +519,10 @@ class PTMHandler:
         arr = channel_coeffarr.reshape((-1, 6))
         light_dir_mat = self.get_light_direction_matrix(arr)
         intensity = np.sum(arr * light_dir_mat, axis=1, dtype=np.float32)
-        return np.squeeze(intensity.reshape((self.imheight,
-                                             self.imwidth, -1)))
+        intensity = np.squeeze(intensity.reshape((self.imheight, self.imwidth,
+                                                  -1))
+                               )
+        return intensity
 
     def form_surface_normal(self, luvec,
                             lvvec):
@@ -477,17 +545,14 @@ class PTMHandler:
 
     def normalize_surface_normal(self, surface_normal):
         "Normalize a given surface normal"
-        ax1 = surface_normal[:, 0]
-        ax2 = surface_normal[:, 1]
-        ax3 = surface_normal[:, 2]
-        normalized = np.zeros_like(surface_normal, dtype=np.float32)
-        ax1norm = ax1 / np.linalg.norm(ax1)
-        ax2norm = ax2 / np.linalg.norm(ax2)
-        ax3norm = ax3 / np.linalg.norm(ax3)
-        normalized[:, 0] = ax1norm
-        normalized[:, 1] = ax2norm
-        normalized[:, 2] = ax3norm
-        return normalized
+        snormal = np.copy(surface_normal)
+        snormal[:, 0] = snormal[:, 0] / np.linalg.norm(
+            snormal[:, 0])
+        snormal[:, 1] = snormal[:, 1] / np.linalg.norm(
+            snormal[:, 1])
+        snormal[:, 2] = snormal[:, 2] / np.linalg.norm(
+            snormal[:, 2])
+        return snormal
 
     def get_light_matrix(self, light_source: LightSource):
         "Get light vector from light source"
@@ -496,8 +561,103 @@ class PTMHandler:
         yarr = coordarr[:, 1]
         xdiff = light_source.x - xarr
         ydiff = light_source.y - yarr
-        zval = light_source.z
-        # TODO continue implementing light vector for dot product
+        light_matrix = np.zeros((coordarr.shape[0], 3))
+        light_matrix[:, 0] = xdiff
+        light_matrix[:, 1] = ydiff
+        light_matrix[:, 2] = light_source.z
+        return light_matrix
+
+    def normalize_light_matrix(self, light_matrix):
+        "Normalize light matrix"
+        return self.normalize_surface_normal(light_matrix)
+
+    def get_diffusion_coefficient(self, norm_surface_normal: np.ndarray,
+                                  norm_light_matrix: np.ndarray):
+        "Get diffusion coefficient"
+        # pdb.set_trace()
+        costheta = np.sum(norm_surface_normal * norm_light_matrix, axis=1,
+                          dtype=np.float32)  # this is same as taking dot
+        # products of vectors
+        costheta = np.where(costheta > 0, costheta, 0)
+        return costheta
+
+    def shade_channel(self, light_source: LightSource,
+                      channel: np.ndarray,
+                      norm_surface_normal: np.ndarray,
+                      ambient_term=0.0,
+                      light_intensity=1.0):
+        "Shade channel"
+        lmat = self.get_light_matrix(light_source)
+        channelarr = ImageArray(channel)
+        flatchannel = channelarr.flatarr
+        distance = light_source.getDistance2Arr(channelarr.coordinates)
+        norm_lmat = self.normalize_light_matrix(light_matrix=lmat)
+        diffusion_coeff = self.get_diffusion_coefficient(norm_surface_normal,
+                                                         norm_lmat)
+        distanceFactor = light_source.z * self.imwidth
+        distanceFactor = distance / distanceFactor
+        distanceFactor = 1 - distanceFactor
+        shaded_channel = flatchannel * distanceFactor * diffusion_coeff
+        shaded_channel = shaded_channel * light_intensity
+        shaded_channel += ambient_term
+        return shaded_channel.reshape(channelarr.arrshape)
+
+    def shade_red_channel(self, light_source: LightSource,
+                          ambient_term: float,
+                          light_intensity: float):
+        "Shade red channel"
+        shaded = self.shade_channel(
+            light_source,
+            ambient_term=ambient_term,
+            light_intensity=light_intensity,
+            channel=self.red_channel_pixel_values,
+            norm_surface_normal=self.red_channel_normalized_surface_normal)
+        return shaded
+
+    def shade_green_channel(self, light_source: LightSource,
+                            ambient_term: float,
+                            light_intensity: float):
+        "Shade green channel"
+        shaded = self.shade_channel(
+            light_source,
+            ambient_term=ambient_term,
+            light_intensity=light_intensity,
+            channel=self.green_channel_pixel_values,
+            norm_surface_normal=self.green_channel_normalized_surface_normal)
+        return shaded
+
+    def shade_blue_channel(self, light_source: LightSource,
+                           ambient_term: float,
+                           light_intensity: float):
+        "Shade blue"
+        shaded = self.shade_channel(
+            light_source,
+            channel=self.blue_channel_pixel_values,
+            ambient_term=ambient_term,
+            light_intensity=light_intensity,
+            norm_surface_normal=self.blue_channel_normalized_surface_normal)
+        return shaded
+
+    def shade_image(self, light_source: LightSource,
+                    ambient_term=0.0,
+                    light_intensity=1.0):
+        "Shade image"
+        image = np.zeros_like(self.image, dtype=np.float32)
+        image[:, :, 0] = self.shade_red_channel(
+            light_source,
+            light_intensity=light_intensity,
+            ambient_term=ambient_term)
+        image[:, :, 1] = self.shade_green_channel(
+            light_source,
+            light_intensity=light_intensity,
+            ambient_term=ambient_term)
+        image[:, :, 2] = self.shade_blue_channel(
+            light_source,
+            light_intensity=light_intensity,
+            ambient_term=ambient_term)
+        imarr = ImageArray(image)
+        imarr = interpolateImage(imarr)
+        return np.fliplr(imarr.image)
 
     def change_diffuse_gain(self, g: float,
                             coeffarr: np.ndarray):
@@ -604,30 +764,6 @@ class PTMHandler:
         result = first_multi + second_multi + third_multi
         return result
 
-    def shade_with_light_source(self, rgb_image: np.ndarray,
-                                angle: int, elevation: int, cmap_fn=None):
-        "Continue"
-        # TODO matplotlib has a shading and light source algorithm
-        # use their shade_rgb directly
-        assert angle > 0 and angle <= 360
-        assert elevation > 0 and elevation < 90
-        grayim = cv2.cvtColor(rgb_image, cv2.COLOR_BGR2GRAY)
-        light = Lsource(angle, elevation)
-        # pdb.set_trace()
-        if cmap_fn is not None:
-            newimage = light.shade(data=grayim, cmap=cmap_fn)
-        else:
-            newimage = light.shade(data=grayim, cmap=plt.cm.hsv)
-        shape = newimage.shape
-        newimage = newimage.flatten()
-        newimage = np.uint8(np.interp(newimage,
-                                      (newimage.min(),
-                                       newimage.max()),
-                                      (0, 255))
-                            )
-        newimage = newimage.reshape(shape)
-
-        return newimage
 
 def setUpHandler(ptmpath: str):
     "From parse ptm file from path and setup ptm handler"
@@ -639,5 +775,4 @@ def setUpHandler(ptmpath: str):
         image_width=out['image_width'],
         scales=out['scales'],
         biases=out['biases'])
-    # handler.setUp()
     return handler
