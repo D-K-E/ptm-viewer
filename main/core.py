@@ -264,9 +264,9 @@ class LightSource:
 
     def __init__(self,
                  x=1.0,  # normalized x
-                 y=0.0,  # normalized y
-                 z=1.0,  # light source distance
-                 intensity=0.1,  # I_p
+                 y=1.0,  # normalized y
+                 z=0.1,  # light source distance
+                 intensity=0.2,  # I_p
                  ambient_intensity=1.0,  # I_a
                  ambient_coefficient=0.1,  # k_a
                  ):
