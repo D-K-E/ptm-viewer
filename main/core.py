@@ -263,8 +263,8 @@ class LightSource:
     "Simple implementation of a light source"
 
     def __init__(self,
-                 x=0.0,  # x
-                 y=0.0,  # y
+                 x=1.0,  # x
+                 y=1.0,  # y
                  z=10.0,  # light source distance
                  intensity=0.2,  # I_p
                  ambient_intensity=1.0,  # I_a
@@ -316,8 +316,8 @@ class ChannelShader:
         self.screen_gamma = screen_gamma
         self.shininess = shininess
         self.diffuse_coeff = diffuse_coeff  # k_d
-        # self.diffuse_color = normalize_1d_array(color)  # O_d: obj diffuse color
-        self.diffuse_color = color  # O_d: obj diffuse color
+        self.diffuse_color = normalize_1d_array(color)  # O_d: obj diffuse color
+        # self.diffuse_color = color  # O_d: obj diffuse color
         self.spec_color = normalize_1d_array(color)  # O_s: obj specular color
         self.spec_coeff = spec_coeff  # k_s: specular coefficient
         self.imsize = imagesize
