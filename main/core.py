@@ -65,8 +65,12 @@ def blockwise_dot(A, B, max_elements=int(2**27), out=None):
 def normalize_1d_array(arr):
     "Normalize 1d array"
     assert arr.ndim == 1
-    return arr / np.linalg.norm(arr)
-
+    result = None
+    if np.linalg.norm(arr) == 0:
+        result = arr
+    else:
+        result = arr / np.linalg.norm(arr)
+    return result
 
 def normalize_3col_array(arr):
     "Normalize 3 column array"
@@ -259,11 +263,13 @@ class LightSource:
     "Simple implementation of a light source"
 
     def __init__(self,
-                 x=10.0,  # normalized x
-                 y=5.0,  # normalized y
-                 z=10.0,
-                 intensity=1.0,
-                 light_power=80.0):
+                 x=1.0,  # normalized x
+                 y=0.0,  # normalized y
+                 z=1.0,  # light source distance
+                 intensity=0.1,  # I_p
+                 ambient_intensity=1.0,  # I_a
+                 ambient_coefficient=0.1,  # k_a
+                 ):
         "light source"
         self.x = x
         self.y = y
@@ -271,7 +277,9 @@ class LightSource:
             assert isinstance(z, float)
         self.z = z
         self.intensity = intensity
-        self.power = light_power
+        self.ambient_intensity = ambient_intensity  # I_a
+        self.ambient_coefficient = ambient_coefficient  # k_a
+        # k_a can be tuned if the material is known
 
     def copy(self):
         "copy self"
@@ -286,30 +294,41 @@ class ChannelShader:
     "Shades channels"
 
     def __init__(self,
-                 normalized_coordarr: np.ndarray,
-                 light_source: LightSource,
+                 coordarr: np.ndarray,
+                 light_source: LightSource,  # has I_a, I_p, k_a
                  surface_normal: np.ndarray,
                  imagesize: (int, int),
-                 color: np.ndarray,
-                 ambient_term=0.0,
-                 spec_color=0.1,
+                 color: np.ndarray,  # they are assumed to be O_d and O_s
+                 spec_coeff=0.8,  # k_s
                  screen_gamma=2.2,
-                 shininess=16.0):
+                 diffuse_coeff=0.1,  # k_d
+                 attenuation_c1=1.0,  # f_attr c1
+                 attenuation_c2=0.0,  # f_attr c2 d_L coefficient
+                 attenuation_c3=0.0,  # f_attr c3 d_L^2 coefficient
+                 shininess=20.0  # n
+                 ):
         self.light_source = light_source
-        self.coordarr = normalized_coordarr
+        self.light_intensity = self.light_source.intensity  # I_p
+        self.ambient_coefficient = self.light_source.ambient_coefficient  # k_a
+        self.ambient_intensity = self.light_source.ambient_intensity  # I_a
+        self.coordarr = coordarr
         self.surface_normal = np.copy(surface_normal)
-        self.ambient_term = ambient_term
         self.screen_gamma = screen_gamma
         self.shininess = shininess
-        self.diffuse_coeff = color
-        self.spec_color = spec_color
+        self.diffuse_coeff = diffuse_coeff  # k_d
+        self.diffuse_color = normalize_1d_array(color)  # O_d: obj diffuse color
+        self.spec_color = normalize_1d_array(color)  # O_s: obj specular color
+        self.spec_coeff = spec_coeff  # k_s: specular coefficient
         self.imsize = imagesize
+        self.att_c1 = attenuation_c1
+        self.att_c2 = attenuation_c2
+        self.att_c3 = attenuation_c3
 
     def copy(self):
         return ChannelShader(coordarr=np.copy(self.coordarr),
                              light_source=self.light_source.copy(),
                              surface_normal=np.copy(self.surface_normal),
-                             color=np.copy(self.diffuse_coeff))
+                             color=np.copy(self.diffuse_coeff) * 255.0)
 
     @property
     def distance(self):
@@ -332,12 +351,26 @@ class ChannelShader:
         xarr = self.coordarr[:, 1]
         xdiff = self.light_source.x - xarr
         ydiff = self.light_source.y - yarr
-        light_matrix = np.empty((self.coordarr.shape[0], 3))
+        light_matrix = np.zeros((self.coordarr.shape[0], 3))
         light_matrix[:, 0] = ydiff
         light_matrix[:, 1] = xdiff
         light_matrix[:, 2] = self.light_source.z
         # light_matrix[:, 2] = 0.0
         return light_matrix
+
+    @property
+    def light_attenuation(self):
+        """
+        Implementing from Foley JD 1996, p. 726
+
+        f_att : light source attenuation function:
+        f_att = min(\frac{1}{c_1 + c_2{\times}d_L + c_3{\times}d^2_{L}} , 1)
+        """
+        second = self.att_c2 * self.distance
+        third = self.att_c3 * self.distance * self.distance
+        result = self.att_c1 + second + third
+        result = 1 / result
+        return np.where(result < 1, result, 1)
 
     @property
     def normalized_light_direction(self):
@@ -349,15 +382,21 @@ class ChannelShader:
         return normalize_3col_array(self.surface_normal)
 
     @property
-    def lambertian(self):
-        "set lambertian"
-        pdb.set_trace()
+    def costheta(self):
+        "set costheta"
+        # pdb.set_trace()
         costheta = get_vector_dot(
             arr1=self.normalized_light_direction,
             arr2=self.normalized_surface_normal)
         # products of vectors
-        costheta = np.where(costheta > 0, costheta, 0)
+        costheta = np.abs(costheta)  # as per (Foley J.D, et.al. 1996, p. 724)
         return costheta
+
+    @property
+    def ambient_term(self):
+        "Get the ambient term I_a * k_a * O_d"
+        term = self.ambient_coefficient * self.ambient_intensity
+        return term * self.diffuse_color
 
     @property
     def view_direction(self):
@@ -366,7 +405,7 @@ class ChannelShader:
         cshape = self.coordarr.shape
         coord = np.zeros((cshape[0], 3))  # x, y, z
         coord[:, :2] = -self.coordarr
-        coord[:, 2] = -1.0  #
+        coord[:, 2] = 0.0  # viewer at infinity
         coord = normalize_3col_array(coord)
         return coord
 
@@ -391,19 +430,26 @@ class ChannelShader:
 
     @property
     def channel_color_blinn_phong(self):
-        "compute new channel color intensities"
-        second = 1.0
-        second *= self.diffuse_coeff
-        second *= self.lambertian
-        # distance factor
-        # second *= self.distance_factor
+        """compute new channel color intensities
+        Implements: Foley J.D. 1996 p. 730 - 731, variation on equation 16.15
+        """
+        second = 1.0  # added for structuring code in this fashion, makes
+        # debugging easier
+        # lambertian terms
+        second *= self.diffuse_coeff  # k_d
+        second *= self.costheta  # (N \cdot L)
+        second *= self.light_intensity  # I_p
+        # adding phong terms
+        # second *= self.light_attenuation  # f_attr
+        # second *= self.diffuse_color  # O_d
         third = 1.0
-        third *= self.spec_color
-        third *= self.specular
+        # third *= self.spec_color  # O_s
+        # third *= self.specular  # (N \cdot H)^n
+        # third *= self.spec_coeff  # k_s
         result = 0.0
-        result += self.ambient_term
+        # result += self.ambient_term  # I_a × k_a × O_d
         result += second
-        result += third
+        # result += third
         # pdb.set_trace()
         return result
 
@@ -711,7 +757,7 @@ class PTMHandler:
         shaded = shaded.reshape(imshape)
         imarr = ImageArray(shaded)
         imarr = interpolateImage(imarr)
-        return imarr.image
+        return np.fliplr(imarr.image)
 
     def change_diffuse_gain(self, g: float,
                             coeffarr: np.ndarray):
@@ -800,7 +846,7 @@ def setUpHandler(ptmpath: str):
         biases=out['biases'])
     light_source = LightSource(x=1,
                                y=1)
-    coordarr = ptm.imarr.coordinates
+    coordarr = ptm.imarr.norm_coordinates
     # pdb.set_trace()
     red_shader = ChannelShader(coordarr,
                                light_source,
