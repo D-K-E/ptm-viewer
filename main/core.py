@@ -263,9 +263,9 @@ class LightSource:
     "Simple implementation of a light source"
 
     def __init__(self,
-                 x=1.0,  # normalized x
-                 y=1.0,  # normalized y
-                 z=0.1,  # light source distance
+                 x=0.0,  # x
+                 y=0.0,  # y
+                 z=10.0,  # light source distance
                  intensity=0.2,  # I_p
                  ambient_intensity=1.0,  # I_a
                  ambient_coefficient=0.1,  # k_a
@@ -441,7 +441,7 @@ class ChannelShader:
         second *= self.light_intensity  # I_p
         # adding phong terms
         # second *= self.light_attenuation  # f_attr
-        # second *= self.diffuse_color  # O_d
+        second *= self.diffuse_color  # O_d
         third = 1.0
         # third *= self.spec_color  # O_s
         # third *= self.specular  # (N \cdot H)^n
@@ -846,7 +846,7 @@ def setUpHandler(ptmpath: str):
         biases=out['biases'])
     light_source = LightSource(x=1,
                                y=1)
-    coordarr = ptm.imarr.norm_coordinates
+    coordarr = ptm.imarr.coordinates
     # pdb.set_trace()
     red_shader = ChannelShader(coordarr,
                                light_source,
