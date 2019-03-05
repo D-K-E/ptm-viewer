@@ -264,8 +264,8 @@ class LightSource:
 
     def __init__(self,
                  x=1.0,  # x
-                 y=1000.0,  # y
-                 z=10.0,  # light source distance
+                 y=2000.0,  # y
+                 z=1.0,  # light source distance: 0 to make it at infinity
                  intensity=0.2,  # I_p
                  ambient_intensity=1.0,  # I_a
                  ambient_coefficient=0.1,  # k_a
@@ -391,7 +391,8 @@ class ChannelShader:
             arr1=self.normalized_light_direction,
             arr2=self.normalized_surface_normal)
         # products of vectors
-        costheta = np.abs(costheta)  # as per (Foley J.D, et.al. 1996, p. 724)
+        # costheta = np.abs(costheta)  # as per (Foley J.D, et.al. 1996, p. 724)
+        costheta = np.where(costheta > 0, costheta, 0)
         return costheta
 
     @property
@@ -847,8 +848,8 @@ def setUpHandler(ptmpath: str):
         image_width=out['image_width'],
         scales=out['scales'],
         biases=out['biases'])
-    light_source = LightSource(x=1.0,
-                               y=1000.0)
+    light_source = LightSource(x=float(out['image_width']),
+                               y=float(out['image_height']))
     coordarr = ptm.imarr.coordinates
     # pdb.set_trace()
     red_shader = ChannelShader(coordarr,
