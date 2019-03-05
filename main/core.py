@@ -357,7 +357,7 @@ class ChannelShader:
         light_matrix[:, 1] = xdiff
         light_matrix[:, 2] = self.light_source.z
         # light_matrix[:, 2] = 0.0
-        # pdb.set_trace()
+        pdb.set_trace()
         return light_matrix
 
     @property
@@ -847,8 +847,8 @@ def setUpHandler(ptmpath: str):
         image_width=out['image_width'],
         scales=out['scales'],
         biases=out['biases'])
-    light_source = LightSource(x=1,
-                               y=1)
+    light_source = LightSource(x=1.0,
+                               y=1000.0)
     coordarr = ptm.imarr.coordinates
     # pdb.set_trace()
     red_shader = ChannelShader(coordarr,
