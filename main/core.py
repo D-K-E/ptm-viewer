@@ -449,6 +449,7 @@ class ChannelShader:
         # third *= self.specular  # (N \cdot H)^n
         # third *= self.spec_coeff  # k_s
         result = 0.0
+        #
         # result += self.ambient_term  # I_a × k_a × O_d
         result += second
         # result += third
