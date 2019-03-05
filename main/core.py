@@ -440,7 +440,7 @@ class ChannelShader:
         # lambertian terms
         # second *= self.diffuse_coeff  # k_d
         second *= self.costheta  # (N \cdot L)
-        second *= self.light_intensity  # I_p
+        # second *= self.light_intensity  # I_p
         # adding phong terms
         # second *= self.light_attenuation  # f_attr
         # second *= self.diffuse_color  # O_d
