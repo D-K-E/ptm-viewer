@@ -76,6 +76,16 @@ class Viewer:
         self.lightRadiusSpin = None
         self.lightIntensityFrame = None
         self.lightIntensitySpin = None
+        #
+        self.shaderControlFrame = None
+        self.diffuseCoeffFrame = None
+        self.diffuseCoeffSpin = None
+        self.shininessFrame = None
+        self.shininessSpin = None
+        self.specColorFrame = None
+        self.specColorSpin = None
+        self.specCoeffFrame = None
+        self.specCoeffSpin = None
 
     def createMainWindow(self):
         "Create the main application window"
@@ -251,7 +261,7 @@ class Viewer:
             master=self.mainWindow,
             text='Controls')
         self.controlFrame.grid(column=2,
-                               columnspan=4,
+                               columnspan=5,
                                row=2,
                                rowspan=4)
         self.mainWindow.grid_columnconfigure(2, weight=1)
@@ -264,8 +274,8 @@ class Viewer:
             text='Diffusion Gain Value',
             font=self.labelFont
         )
-        self.diffFrame.grid(column=4,
-                            row=1,
+        self.diffFrame.grid(column=6,
+                            row=0,
                             in_=self.controlFrame,
                             ipadx=2,
                             )
@@ -278,9 +288,8 @@ class Viewer:
             to=10.0,
             increment=0.03)
         self.diffGainSpin.grid(
-            column=4,
-            in_=self.diffFrame,
-            row=1)
+            column=6,
+            row=0)
 
     def createShaderFrame(self):
         "create shader frame"
@@ -290,7 +299,7 @@ class Viewer:
             font=self.labelFont
         )
         self.shaderFrame.grid(
-            column=3,
+            column=6,
             row=1,
             ipadx=1,
             padx=1)
@@ -301,28 +310,26 @@ class Viewer:
             master=self.shaderFrame,
             values=['cell', 'phong']
         )
-        self.shaderComboBox.grid(column=2,
-                                 in_=self.shaderFrame,
-                                 row=2)
+        self.shaderComboBox.grid(column=6,
+                                 row=1)
 
     def createAmbientTermFrame(self):
         "Ambient term container"
         self.ambientTermFrame = tkinter.LabelFrame(
-            master=self.controlFrame,
+            master=self.shaderControlFrame,
             text="Ambient Term",
             font=self.labelFont)
-        self.ambientTermFrame.grid(column=3,
-                                   row=0)
+        self.ambientTermFrame.grid(column=2,
+                                   row=6)
 
     def createAmbientTermSpin(self):
         "Ambient term"
         self.ambientTermSpin = tkinter.Spinbox(
             master=self.ambientTermFrame,
-            from_=0.00,
-            to=0.99,
-            increment=0.01)
+            from_=0.0000000000001,
+            to=0.9)
         self.ambientTermSpin.grid(column=3,
-                                  row=0)
+                                  row=2)
 
     def createLightOptionsFrame(self):
         "Regroups the light options"
@@ -412,6 +419,91 @@ class Viewer:
         self.lightIntensitySpin.grid(column=1,
                                      row=1)
 
+    # shader options
+
+    def createShaderControlFrame(self):
+        "shader options container"
+        self.shaderControlFrame = tkinter.LabelFrame(
+            master=self.controlFrame,
+            text="Shader Controls",
+            font=self.labelFont)
+        self.shaderControlFrame.grid(rowspan=2,
+                                     row=0,
+                                     column=3,
+                                     columnspan=2)
+
+    def createDiffuseCoeffFrame(self):
+        "diffuse coefficient frame"
+        self.diffuseCoeffFrame = tkinter.LabelFrame(
+            master=self.shaderControlFrame,
+            text="Diffuse Coefficient",
+            font=self.labelFont)
+
+        self.diffuseCoeffFrame.grid(row=0,
+                                    column=3)
+
+    def createDiffuseCoeffSpin(self):
+        "diffuse coefficient spin box"
+        self.diffuseCoeffSpin = tkinter.Spinbox(
+            master=self.diffuseCoeffFrame,
+            from_=0.00000000001,
+            to=0.99999999999)
+        self.diffuseCoeffSpin.grid(row=0,
+                                   column=3)
+
+    def createShininessFrame(self):
+        "shininess frame"
+        self.shininessFrame = tkinter.LabelFrame(
+            master=self.shaderControlFrame,
+            text="Shininess",
+            font=self.labelFont)
+        self.shininessFrame.grid(row=1,
+                                 column=3)
+
+    def createShininessSpin(self):
+        "shininess spin box"
+        self.shininessSpin = tkinter.Spinbox(
+            master=self.shininessFrame,
+            from_=0.01,
+            to=1000
+        )
+        self.shininessSpin.grid(row=1,
+                                column=3)
+
+    def createSpecColorFrame(self):
+        "spec color label frame"
+        self.specColorFrame = tkinter.LabelFrame(
+            master=self.shaderControlFrame,
+            text="Specular Color Value",
+            font=self.labelFont)
+        self.specColorFrame.grid(column=4, row=4)
+
+    def createSpecColorSpin(self):
+        "spec color spin box"
+        self.specColorSpin = tkinter.Spinbox(
+            master=self.specColorFrame,
+            from_=0.1,
+            to=1.0)
+
+        self.specColorSpin.grid(column=4, row=4)
+
+    def createSpecCoeffFrame(self):
+        "Spec coefficient frame"
+        self.specCoeffFrame = tkinter.LabelFrame(
+            master=self.shaderControlFrame,
+            text="Specular Coefficient",
+            font=self.labelFont)
+        self.specCoeffFrame.grid(column=5, row=7)
+
+    def createSpecCoeffSpin(self):
+        "Spec coefficient spin box"
+        self.specCoeffSpin = tkinter.Spinbox(
+            master=self.specCoeffFrame,
+            from_=0.000000001,
+            to=1.0
+        )
+        self.specCoeffFrame.grid(column=5, row=7)
+
     def createWidgets(self):
         "Create widgets in their proper layout"
         self.createMainWindow()
@@ -434,6 +526,16 @@ class Viewer:
         # Shader
         self.createShaderFrame()
         self.createShaderComboBox()
+        # Shader options
+        self.createShaderControlFrame()
+        self.createDiffuseCoeffFrame()
+        self.createDiffuseCoeffSpin()
+        self.createShininessFrame()
+        self.createShininessSpin()
+        self.createSpecColorFrame()
+        self.createSpecColorSpin()
+        self.createSpecCoeffFrame()
+        self.createSpecCoeffSpin()
         # light options
         self.createLightOptionsFrame()
         self.createLightPosXFrame()

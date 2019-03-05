@@ -297,7 +297,6 @@ class ChannelShader:
                  coordarr: np.ndarray,
                  light_source: LightSource,  # has I_a, I_p, k_a
                  surface_normal: np.ndarray,
-                 imagesize: (int, int),
                  color: np.ndarray,  # they are assumed to be O_d and O_s
                  spec_coeff=0.1,  # k_s
                  spec_color=1.0,  # O_s: obj specular color. It can be
@@ -323,7 +322,6 @@ class ChannelShader:
         self.diffuse_color = color  # O_d: obj diffuse color
         self.spec_color = spec_color  # O_s
         self.spec_coeff = spec_coeff  # k_s: specular coefficient
-        self.imsize = imagesize
         self.att_c1 = attenuation_c1
         self.att_c2 = attenuation_c2
         self.att_c3 = attenuation_c3
@@ -332,7 +330,7 @@ class ChannelShader:
         return ChannelShader(coordarr=np.copy(self.coordarr),
                              light_source=self.light_source.copy(),
                              surface_normal=np.copy(self.surface_normal),
-                             color=np.copy(self.diffuse_coeff) * 255.0)
+                             color=np.copy(self.diffuse_color))
 
     @property
     def distance(self):
