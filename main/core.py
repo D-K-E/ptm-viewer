@@ -851,7 +851,9 @@ def setUpHandler(ptmpath: str):
         scales=out['scales'],
         biases=out['biases'])
     light_source = LightSource(x=float(out['image_width']),
-                               y=float(out['image_height']))
+                               y=float(out['image_height']),
+                               ambient_coefficient=0.000000002,  # k_a
+                               )
     coordarr = ptm.imarr.coordinates
     # pdb.set_trace()
     red_shader = ChannelShader(coordarr,
