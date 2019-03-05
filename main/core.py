@@ -447,7 +447,7 @@ class ChannelShader:
         second *= self.diffuse_color  # O_d
         third = 1.0
         third *= self.spec_color  # O_s
-        # third *= self.specular  # (N \cdot H)^n
+        third *= self.specular  # (N \cdot H)^n
         # third *= self.spec_coeff  # k_s
         result = 0.0
         #
