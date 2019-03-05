@@ -299,7 +299,7 @@ class ChannelShader:
                  surface_normal: np.ndarray,
                  imagesize: (int, int),
                  color: np.ndarray,  # they are assumed to be O_d and O_s
-                 spec_coeff=0.9,  # k_s
+                 spec_coeff=0.99999999,  # k_s
                  screen_gamma=2.2,
                  diffuse_coeff=0.1,  # k_d
                  attenuation_c1=1.0,  # f_attr c1
