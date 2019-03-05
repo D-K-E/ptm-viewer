@@ -305,7 +305,7 @@ class ChannelShader:
                  attenuation_c1=1.0,  # f_attr c1
                  attenuation_c2=1.0,  # f_attr c2 d_L coefficient
                  attenuation_c3=1.0,  # f_attr c3 d_L^2 coefficient
-                 shininess=20.0  # n
+                 shininess=2000.0  # n
                  ):
         self.light_source = light_source
         self.light_intensity = self.light_source.intensity  # I_p
