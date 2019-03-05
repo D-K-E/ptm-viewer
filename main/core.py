@@ -859,7 +859,6 @@ def setUpHandler(ptmpath: str):
     # pdb.set_trace()
     red_shader = ChannelShader(coordarr,
                                light_source,
-                               imagesize=ptm.imarr.image.shape[:2],
                                color=ptm.red_channel_normalized_pixel_values,
                                surface_normal=ptm.red_channel_surface_normal)
     green_shader = ChannelShader(coordarr,
