@@ -357,6 +357,7 @@ class ChannelShader:
         light_matrix[:, 1] = xdiff
         light_matrix[:, 2] = self.light_source.z
         # light_matrix[:, 2] = 0.0
+        # pdb.set_trace()
         return light_matrix
 
     @property
@@ -442,7 +443,7 @@ class ChannelShader:
         second *= self.light_intensity  # I_p
         # adding phong terms
         # second *= self.light_attenuation  # f_attr
-        second *= self.diffuse_color  # O_d
+        # second *= self.diffuse_color  # O_d
         third = 1.0
         # third *= self.spec_color  # O_s
         # third *= self.specular  # (N \cdot H)^n
