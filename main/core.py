@@ -438,7 +438,7 @@ class ChannelShader:
         second = 1.0  # added for structuring code in this fashion, makes
         # debugging easier
         # lambertian terms
-        second *= self.diffuse_coeff  # k_d
+        # second *= self.diffuse_coeff  # k_d
         second *= self.costheta  # (N \cdot L)
         second *= self.light_intensity  # I_p
         # adding phong terms
