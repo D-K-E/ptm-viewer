@@ -264,8 +264,8 @@ class LightSource:
 
     def __init__(self,
                  x=1.0,  # x
-                 y=2000.0,  # y
-                 z=1.0,  # light source distance: 0 to make it at infinity
+                 y=1.0,  # y
+                 z=0.0,  # light source distance: 0 to make it at infinity
                  intensity=0.2,  # I_p
                  ambient_intensity=1.0,  # I_a
                  ambient_coefficient=0.1,  # k_a
@@ -439,7 +439,7 @@ class ChannelShader:
         second = 1.0  # added for structuring code in this fashion, makes
         # debugging easier
         # lambertian terms
-        # second *= self.diffuse_coeff  # k_d
+        second *= self.diffuse_coeff  # k_d
         second *= self.costheta  # (N \cdot L)
         # second *= self.light_intensity  # I_p
         # adding phong terms
