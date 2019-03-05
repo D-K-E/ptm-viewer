@@ -303,7 +303,7 @@ class ChannelShader:
                  spec_color=1.0,  # O_s: obj specular color. It can be
                  # optimized with respect to surface material
                  screen_gamma=2.2,
-                 diffuse_coeff=0.005,  # k_d
+                 diffuse_coeff=0.008,  # k_d
                  # a good value is between 0.01 and 0.1
                  attenuation_c1=1.0,  # f_attr c1
                  attenuation_c2=0.0,  # f_attr c2 d_L coefficient
