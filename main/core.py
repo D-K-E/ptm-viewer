@@ -268,7 +268,7 @@ class LightSource:
                  z=20.0,  # light source distance: 0 to make it at infinity
                  intensity=1.0,  # I_p
                  ambient_intensity=0.0001,  # I_a
-                 ambient_coefficient=0.1,  # k_a
+                 ambient_coefficient=0.0001,  # k_a
                  ):
         "light source"
         self.x = x
@@ -299,7 +299,7 @@ class ChannelShader:
                  surface_normal: np.ndarray,
                  imagesize: (int, int),
                  color: np.ndarray,  # they are assumed to be O_d and O_s
-                 spec_coeff=0.6,  # k_s
+                 spec_coeff=0.001,  # k_s
                  screen_gamma=2.2,
                  diffuse_coeff=0.2,  # k_d
                  attenuation_c1=1.0,  # f_attr c1
