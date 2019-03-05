@@ -23,10 +23,13 @@ def main():
         'ambient_intensity': handler.light_source.ambient_intensity}
     spec_normed = False
     spec_color = handler.shader.blue_shader.spec_color
-    spec_color = spec_color < 1
-    spec_color = spec_color.all()
-    if spec_color:
-        spec_normed = True
+    if not isinstance(spec_color, float):
+        spec_color = spec_color < 1
+        spec_color = spec_color.all()
+        if spec_color:
+            spec_normed = True
+    else:
+        spec_normed = spec_color
     diff_normed = False
     diff_color = handler.shader.blue_shader.diffuse_color
     diff_color = diff_color < 1

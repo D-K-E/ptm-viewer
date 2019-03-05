@@ -300,6 +300,8 @@ class ChannelShader:
                  imagesize: (int, int),
                  color: np.ndarray,  # they are assumed to be O_d and O_s
                  spec_coeff=0.1,  # k_s
+                 spec_color=1.0,  # O_s: obj specular color. It can be
+                 # optimized with respect to surface material
                  screen_gamma=2.2,
                  diffuse_coeff=0.1,  # k_d
                  attenuation_c1=1.0,  # f_attr c1
@@ -318,7 +320,7 @@ class ChannelShader:
         self.diffuse_coeff = diffuse_coeff  # k_d
         self.diffuse_color = normalize_1d_array(color)  # O_d: obj diffuse color
         # self.diffuse_color = color  # O_d: obj diffuse color
-        self.spec_color = normalize_1d_array(color)  # O_s: obj specular color
+        self.spec_color = spec_color  # O_s
         self.spec_coeff = spec_coeff  # k_s: specular coefficient
         self.imsize = imagesize
         self.att_c1 = attenuation_c1
