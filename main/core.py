@@ -318,8 +318,8 @@ class ChannelShader:
         self.screen_gamma = screen_gamma
         self.shininess = shininess
         self.diffuse_coeff = diffuse_coeff  # k_d
-        self.diffuse_color = normalize_1d_array(color)  # O_d: obj diffuse color
-        # self.diffuse_color = color  # O_d: obj diffuse color
+        # self.diffuse_color = normalize_1d_array(color)  # O_d: obj diffuse color
+        self.diffuse_color = color  # O_d: obj diffuse color
         self.spec_color = spec_color  # O_s
         self.spec_coeff = spec_coeff  # k_s: specular coefficient
         self.imsize = imagesize
