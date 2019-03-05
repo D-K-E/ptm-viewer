@@ -267,8 +267,8 @@ class LightSource:
                  y=1.0,  # y
                  z=20.0,  # light source distance: 0 to make it at infinity
                  intensity=1.0,  # I_p
-                 ambient_intensity=1.0000,  # I_a
-                 ambient_coefficient=0.0001,  # k_a
+                 ambient_intensity=0.00001,  # I_a
+                 ambient_coefficient=0.00001,  # k_a
                  ):
         "light source"
         self.x = x
