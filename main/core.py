@@ -444,7 +444,7 @@ class ChannelShader:
         second *= self.light_intensity  # I_p
         # adding phong terms
         second *= self.light_attenuation  # f_attr
-        # second *= self.diffuse_color  # O_d
+        second *= self.diffuse_color  # O_d
         third = 1.0
         # third *= self.spec_color  # O_s
         # third *= self.specular  # (N \cdot H)^n
