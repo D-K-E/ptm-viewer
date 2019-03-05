@@ -266,7 +266,7 @@ class LightSource:
                  x=1.0,  # x
                  y=1.0,  # y
                  z=0.0,  # light source distance: 0 to make it at infinity
-                 intensity=0.2,  # I_p
+                 intensity=1.0,  # I_p
                  ambient_intensity=1.0,  # I_a
                  ambient_coefficient=0.1,  # k_a
                  ):
@@ -357,7 +357,7 @@ class ChannelShader:
         light_matrix[:, 1] = xdiff
         light_matrix[:, 2] = self.light_source.z
         # light_matrix[:, 2] = 0.0
-        pdb.set_trace()
+        # pdb.set_trace()
         return light_matrix
 
     @property
@@ -441,7 +441,7 @@ class ChannelShader:
         # lambertian terms
         second *= self.diffuse_coeff  # k_d
         second *= self.costheta  # (N \cdot L)
-        # second *= self.light_intensity  # I_p
+        second *= self.light_intensity  # I_p
         # adding phong terms
         # second *= self.light_attenuation  # f_attr
         # second *= self.diffuse_color  # O_d
