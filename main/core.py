@@ -304,11 +304,11 @@ class ChannelShader:
                  # optimized with respect to surface material
                  screen_gamma=2.2,
                  diffuse_coeff=0.008,  # k_d
-                 # a good value is between 0.01 and 0.1
+                 # a good value is between 0.007 and 0.1
                  attenuation_c1=1.0,  # f_attr c1
                  attenuation_c2=0.0,  # f_attr c2 d_L coefficient
                  attenuation_c3=0.0,  # f_attr c3 d_L^2 coefficient
-                 shininess=2000.0  # n
+                 shininess=20.0  # n
                  ):
         self.light_source = light_source
         self.light_intensity = self.light_source.intensity  # I_p
