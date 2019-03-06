@@ -264,11 +264,11 @@ class LightSource:
 
     def __init__(self,
                  x=1.0,  # x
-                 y=1000.0,  # y
-                 z=10.0,  # light source distance
-                 intensity=0.2,  # I_p
+                 y=1.0,  # y
+                 z=20.0,  # light source distance: 0 to make it at infinity
+                 intensity=1.0,  # I_p
                  ambient_intensity=1.0,  # I_a
-                 ambient_coefficient=0.1,  # k_a
+                 ambient_coefficient=0.000000002,  # k_a
                  ):
         "light source"
         self.x = x
@@ -297,11 +297,13 @@ class ChannelShader:
                  coordarr: np.ndarray,
                  light_source: LightSource,  # has I_a, I_p, k_a
                  surface_normal: np.ndarray,
-                 imagesize: (int, int),
                  color: np.ndarray,  # they are assumed to be O_d and O_s
-                 spec_coeff=0.8,  # k_s
+                 spec_coeff=0.1,  # k_s
+                 spec_color=1.0,  # O_s: obj specular color. It can be
+                 # optimized with respect to surface material
                  screen_gamma=2.2,
-                 diffuse_coeff=0.1,  # k_d
+                 diffuse_coeff=0.008,  # k_d
+                 # a good value is between 0.007 and 0.1
                  attenuation_c1=1.0,  # f_attr c1
                  attenuation_c2=0.0,  # f_attr c2 d_L coefficient
                  attenuation_c3=0.0,  # f_attr c3 d_L^2 coefficient
@@ -316,11 +318,10 @@ class ChannelShader:
         self.screen_gamma = screen_gamma
         self.shininess = shininess
         self.diffuse_coeff = diffuse_coeff  # k_d
-        self.diffuse_color = normalize_1d_array(color)  # O_d: obj diffuse color
-        # self.diffuse_color = color  # O_d: obj diffuse color
-        self.spec_color = normalize_1d_array(color)  # O_s: obj specular color
+        # self.diffuse_color = normalize_1d_array(color)  # O_d: obj diffuse color
+        self.diffuse_color = color  # O_d: obj diffuse color
+        self.spec_color = spec_color  # O_s
         self.spec_coeff = spec_coeff  # k_s: specular coefficient
-        self.imsize = imagesize
         self.att_c1 = attenuation_c1
         self.att_c2 = attenuation_c2
         self.att_c3 = attenuation_c3
@@ -329,7 +330,7 @@ class ChannelShader:
         return ChannelShader(coordarr=np.copy(self.coordarr),
                              light_source=self.light_source.copy(),
                              surface_normal=np.copy(self.surface_normal),
-                             color=np.copy(self.diffuse_coeff) * 255.0)
+                             color=np.copy(self.diffuse_color))
 
     @property
     def distance(self):
@@ -391,14 +392,17 @@ class ChannelShader:
             arr1=self.normalized_light_direction,
             arr2=self.normalized_surface_normal)
         # products of vectors
-        costheta = np.abs(costheta)  # as per (Foley J.D, et.al. 1996, p. 724)
+        # costheta = np.abs(costheta)  # as per (Foley J.D, et.al. 1996, p. 724)
+        costheta = np.where(costheta > 0, costheta, 0)
         return costheta
 
     @property
     def ambient_term(self):
         "Get the ambient term I_a * k_a * O_d"
         term = self.ambient_coefficient * self.ambient_intensity
-        return term * self.diffuse_color
+        term *= self.diffuse_color
+        # pdb.set_trace()
+        return term
 
     @property
     def view_direction(self):
@@ -438,21 +442,21 @@ class ChannelShader:
         second = 1.0  # added for structuring code in this fashion, makes
         # debugging easier
         # lambertian terms
-        # second *= self.diffuse_coeff  # k_d
+        second *= self.diffuse_coeff  # k_d
         second *= self.costheta  # (N \cdot L)
-        # second *= self.light_intensity  # I_p
+        second *= self.light_intensity  # I_p
         # adding phong terms
-        # second *= self.light_attenuation  # f_attr
-        # second *= self.diffuse_color  # O_d
+        second *= self.light_attenuation  # f_attr
+        second *= self.diffuse_color  # O_d
         third = 1.0
-        # third *= self.spec_color  # O_s
-        # third *= self.specular  # (N \cdot H)^n
-        # third *= self.spec_coeff  # k_s
+        third *= self.spec_color  # O_s
+        third *= self.specular  # (N \cdot H)^n
+        third *= self.spec_coeff  # k_s
         result = 0.0
         #
-        # result += self.ambient_term  # I_a × k_a × O_d
+        result += self.ambient_term  # I_a × k_a × O_d
         result += second
-        # result += third
+        result += third
         # pdb.set_trace()
         return result
 
@@ -847,13 +851,14 @@ def setUpHandler(ptmpath: str):
         image_width=out['image_width'],
         scales=out['scales'],
         biases=out['biases'])
-    light_source = LightSource(x=1,
-                               y=1)
+    light_source = LightSource(x=float(out['image_width']),
+                               y=float(out['image_height']),
+                               ambient_coefficient=0.000000002,  # k_a
+                               )
     coordarr = ptm.imarr.coordinates
     # pdb.set_trace()
     red_shader = ChannelShader(coordarr,
                                light_source,
-                               imagesize=ptm.imarr.image.shape[:2],
                                color=ptm.red_channel_normalized_pixel_values,
                                surface_normal=ptm.red_channel_surface_normal)
     green_shader = ChannelShader(coordarr,
