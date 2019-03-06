@@ -427,7 +427,7 @@ class Viewer:
     def createLightZSpin(self):
         "light radius spin inside light radius frame"
         self.lightZSpin = tkinter.Spinbox(
-            master=self.lightRadiusFrame,
+            master=self.lightZFrame,
             from_=1.0,
             to=100.0,
             increment=1)
@@ -667,7 +667,6 @@ class Viewer:
 
     def getRenderValues(self):
         "Get values to render the image"
-        self.handler = self.handler_original.copy()
         light_source_x = self.lightPosXSpin.get()
         light_source_y = self.lightPosYSpin.get()
         light_source_z = self.lightZSpin.get()
@@ -682,23 +681,25 @@ class Viewer:
                               z=light_source_z,
                               intensity=light_intensity,
                               ambient_coefficient=ambient_term)
-        blue_pixels = self.ptm.blue_channel_pixel_values
-        red_pixels = self.ptm.red_channel_pixel_values
-        green_pixels = self.ptm.green_channel_pixel_values
-        normals = self.ptm.surface_normals
-        coordarr = self.ptm.imarr.coordinates
+        blue_pixels = np.copy(self.ptm.blue_channel_normalized_pixel_values)
+        red_pixels = np.copy(self.ptm.red_channel_normalized_pixel_values)
+        green_pixels = np.copy(self.ptm.green_channel_normalized_pixel_values)
+        bnormals = np.copy(self.ptm.blue_channel_surface_normal)
+        rnormals = np.copy(self.ptm.red_channel_surface_normal)
+        gnormals = np.copy(self.ptm.green_channel_surface_normal)
+        coordarr = np.copy(self.ptm.imarr.coordinates)
         red_shader = core.ChannelShader(coordarr,
                                         lsource,
                                         color=red_pixels,
-                                        surface_normal=normals)
+                                        surface_normal=rnormals)
         blue_shader = core.ChannelShader(coordarr,
                                          lsource,
                                          color=blue_pixels,
-                                         surface_normal=normals)
+                                         surface_normal=bnormals)
         green_shader = core.ChannelShader(coordarr,
                                           lsource,
                                           color=green_pixels,
-                                          surface_normal=normals)
+                                          surface_normal=gnormals)
         shader = core.Shader(red_shader, green_shader, blue_shader)
         handler = core.PTMHandler(self.ptm, shader, lsource)
 
@@ -712,7 +713,7 @@ class Viewer:
 
     def resetRendering(self):
         "reset rendering values"
-        self.loadImage2Canvas(self.handler_original.image)
+        self.loadImage2Canvas(np.copy(self.ptm.image))
 
     def load2Canvas(self):
         "Handle image loading event"
