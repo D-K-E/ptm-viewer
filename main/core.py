@@ -4,6 +4,7 @@
 
 import numpy as np
 # import cupy as np
+import arrayfire as af
 import pdb
 
 # from stack overflow
@@ -59,50 +60,270 @@ def blockwise_dot(A, B, max_elements=int(2**27), out=None):
 
     return out
 
+
+def remap(x, nMin, nMax):
+    """
+    Adapted for np and af from SO:
+    https://stackoverflow.com/a/15537393/7330813
+    """
+    if isinstance(x, np.ndarray):
+        oMin = x.min()
+        oMax = x.max()
+    elif isinstance(x, af.Array):
+        oMin = af.algorithm.min(x)
+        oMax = af.algorithm.max(x)
+    else:
+        raise TypeError('Unsupported type {0} for array, use either numpy '\
+                        'ndarray or arrayfire Array'.format(type(x)))
+    # range check
+    if oMin == oMax:
+        print("Warning: Zero input range")
+        return None
+
+    if nMin == nMax:
+        print("Warning: Zero output range")
+        return None
+
+    # check reversed input range
+    reverseInput = False
+    oldMin = min(oMin, oMax)
+    oldMax = max(oMin, oMax)
+    if not oldMin == oMin:
+        reverseInput = True
+
+    # check reversed output range
+    reverseOutput = False
+    newMin = min(nMin, nMax)
+    newMax = max(nMin, nMax)
+    if not newMin == nMin:
+        reverseOutput = True
+
+    portion = (x-oldMin)*(newMax-newMin)/(oldMax-oldMin)
+    if reverseInput:
+        portion = (oldMax-x)*(newMax-newMin)/(oldMax-oldMin)
+
+    result = portion + newMin
+    if reverseOutput:
+        result = newMax - portion
+
+    return result
+
+
 # end stack overflow
 
 
-def normalize_1d_array(arr):
+def empty_arr(shape: (int),
+              backend="arrayfire"):
+    "Get an empty array based on backend"
+    if backend == "arrayfire":
+        arr = af.Array(None, shape)
+    elif backend == "numpy":
+        arr = np.empty(shape)
+    else:
+        raise ValueError('Unknown backend {0}'.format(backend))
+    return arr
+
+
+def fill_arr(arr,
+             cond,
+             fillval,
+             backend="arrayfire"):
+    "Fill array based on condition and backend"
+    if backend == "numpy":
+        newarr = np.where(cond, arr, fillval)
+    elif backend == "arrayfire":
+        newarr = arr.copy()
+        af.data.replace(newarr, cond, fillval)
+    else:
+        raise ValueError('Unknown backend {0}'.format(backend))
+    return newarr
+
+
+def normalize_1d_array_af(arr):
+    "Normalize 1d array"
+    assert arr.numdims() == 1
+    result = None
+    normarr = af.lapack.norm(arr)
+    if normarr == 0:
+        result = arr
+    else:
+        result = arr / normarr
+    return result
+
+
+def normalize_1d_array_np(arr):
     "Normalize 1d array"
     assert arr.ndim == 1
     result = None
-    if np.linalg.norm(arr) == 0:
+    normarr = np.linalg.norm(arr)
+    if normarr == 0:
         result = arr
     else:
-        result = arr / np.linalg.norm(arr)
+        result = arr / normarr
     return result
+
+
+def normalize_1d_array(arr):
+    "Normalize array based on instance type"
+    if isinstance(arr, np.ndarray):
+        normed = normalize_1d_array_np(arr)
+    elif isinstance(arr, af.Array):
+        normed = normalize_1d_array_af(arr)
+    else:
+        TypeError("Unknown array instance type {0}".format(type(arr)))
+
+    return normed
+
 
 def normalize_3col_array(arr):
     "Normalize 3 column array"
     assert arr.shape[1] == 3
-    assert arr.ndim == 2
-    normal = np.copy(arr)
+    assert len(arr.shape) == 2
+    normal = arr.copy()
     normal[:, 0] = normalize_1d_array(normal[:, 0])
     normal[:, 1] = normalize_1d_array(normal[:, 1])
     normal[:, 2] = normalize_1d_array(normal[:, 2])
     return normal
 
 
-def get_vector_dot(arr1, arr2):
+def normalize_rows_3col_array_np(arr):
+    "normalize array with numpy backend"
+    normed = np.empty_like(arr)
+    for i in range(arr.shape[0]):
+        normed[i, :] = normalize_3col_array(arr[i, :])
+    return normed
+
+
+def normalize_rows_3col_array_af(arr):
+    "normalize array with arrayfire backend"
+    # pdb.set_trace()
+    normed = empty_arr(arr.shape, "arrayfire")
+    for i in range(arr.shape[0]):
+        ax = arr[i, :]
+        # pdb.set_trace()
+        ashape = ax.shape
+        newax = af.data.moddims(ax[0, :],
+                                *ashape[1:])  # since it has a shape like 1, X, 3,
+
+        normed[i, :] = af.data.moddims(normalize_3col_array(newax),
+                                       *ashape)
+    return normed
+
+
+def normalize_rows_3col_array(arr):
+    "Normalize array with 3rows in ax0 and 3cols in ax2"
+    assert arr.shape[0] == 3
+    if isinstance(arr, np.ndarray):
+        normed = normalize_rows_3col_array_np(arr)
+    elif isinstance(arr, af.Array):
+        normed = normalize_rows_3col_array_af(arr)
+    return normed
+
+
+def get_vector_dot_np(arr1: af.Array, arr2: af.Array):
     "Get vector dot product for 2 matrices"
     assert arr1.shape == arr2.shape
-    newarr = np.sum(arr1 * arr2, axis=1, dtype=np.float32)
+    # newarr = np.sum(arr1 * arr2, axis=1, dtype=np.float32)
+    prod = arr1 * arr2
+    newarr = af.sum(prod, 1)
     return newarr
 
 
-def get_matrix_to_vector_dot(mat: np.ndarray,
-                             vec: np.ndarray):
-    "Get vector dot for each segment of matrix"
+def get_vector_dot_af(arr1: af.Array, arr2: af.Array):
+    "Get vector dot product for 2 matrices"
+    assert arr1.shape == arr2.shape
+    # newarr = np.sum(arr1 * arr2, axis=1, dtype=np.float32)
+    prod = arr1 * arr2
+    newarr = af.sum(prod, 1)
+    return newarr
+
+
+def get_vector_dot(arr1, arr2):
+    "Get vector dot based on instance type"
+    assert type(arr1) == type(arr2)
+    if isinstance(arr1, np.ndarray):
+        prod = get_vector_dot_np(arr1, arr2)
+    elif isinstance(arr1, af.Array):
+        prod = get_vector_dot_af(arr1, arr2)
+    else:
+        TypeError("Unknown array instance type {0}".format(
+            type(arr1)
+        )
+        )
+    return prod
+
+
+def get_matrix_to_vector_dot_np(mat,
+                                vec):
+    "Get vector dot for each segment of matrix for numpy"
     mshape = mat[0, :].shape
     assert mshape == vec.shape
-    d1 = get_vector_dot(mat[0, :], vec)
-    d2 = get_vector_dot(mat[1, :], vec)
-    d3 = get_vector_dot(mat[2, :], vec)
-    newmat = np.empty(mshape)
-    newmat[:, 0] = d1
-    newmat[:, 1] = d2
-    newmat[:, 2] = d3
+    newmat = np.empty_like(mat)
+    for i in range(mat.shape[0]):
+        dimarr = get_vector_dot_np(mat[i, :], vec)
+        newmat[i, :] = dimarr
     return newmat
+
+
+def get_matrix_to_vector_dot_af(mat: af.Array,
+                                vec: af.Array):
+    "Get vector dot product for each segment of matrix"
+    mshape = mat.shape[1:]
+    assert mshape == vec.shape
+    newmat = empty_arr(mshape)
+    for i in range(mat.shape[0]):
+        dimarr = mat[i, :]
+        dimarrsh = dimarr.shape
+        dimarr = af.data.moddims(dimarr, *dimarrsh[1:])
+        dimarr = get_vector_dot_af(dimarr, vec)
+        # pdb.set_trace()
+        newmat[:, i] = dimarr
+    #
+    return newmat
+
+
+def get_matrix_to_vector_dot(mat,  # np.ndarray or af.Array
+                             vec  # np.ndarray or af.Array
+                             ):
+    "Get vector dot for each segment of matrix"
+    assert type(mat) == type(vec)
+
+    if isinstance(mat, np.ndarray):
+        result = get_matrix_to_vector_dot_np(mat, vec)
+    elif isinstance(mat, af.Array):
+        result = get_matrix_to_vector_dot_af(mat, vec)
+    else:
+        raise TypeError('Unknown type {0} for args. Expected numpy ndarray or'\
+                        ' arrayfire.Array'.format(type(mat)))
+
+    return result
+
+
+def mul_matcols2vec_np(mat: np.ndarray, vec: np.ndarray):
+    "Multiply columns of the matrix with vector"
+    assert mat.shape[0] == vec.shape[0]
+    return mat * vec
+
+
+def mul_matcols2vec_af(mat: af.Array, vec: af.Array):
+    "Multiply columns of the matrix with vecto"
+    assert mat.shape[0] == vec.shape[0]
+    for i in range(mat.shape[1]):
+        mat[:, i] = mat[:, i] * vec
+    return mat
+
+
+def mul_matcols2vec(mat, vec):
+    "Multiply columns of the matrix with vector"
+    assert type(mat) == type(vec)
+    if isinstance(mat, np.ndarray):
+        res = mul_matcols2vec_np(mat, vec)
+    elif isinstance(mat, af.Array):
+        res = mul_matcols2vec_af(mat, vec)
+    else:
+        raise TypeError('Unknown type {0} for args. Expected numpy ndarray or'\
+                        ' arrayfire.Array'.format(type(mat)))
+    return res
 
 
 def factor_3colmat_with_vec(mat: np.ndarray,
@@ -196,28 +417,52 @@ class PTMFileParse:
         return out
 
 
-def getDistancePoint2Array(apoint, coordarr):
+def getDistancePoint2Array_af(apoint, coordarr):
     "Get distance between point1 and point2"
     yarr = coordarr[:, 0]  # row nb
     xarr = coordarr[:, 1]  # col nb
     xdist = (apoint.x - xarr)**2
     ydist = (apoint.y - yarr)**2
-    return np.sqrt(xdist + ydist)
+    return af.arith.sqrt(xdist + ydist)
 
 
 class ImageArray:
-    "Image array have some additional properties besides np.ndarray"
+    "Image array have some additional properties based on backend"
 
     def __init__(self, image: np.ndarray):
-        assert isinstance(image, np.ndarray)
+        if isinstance(image, np.ndarray):
+            self.backend = "numpy"
+        elif isinstance(image, af.Array):
+            self.backend = "arrayfire"
+        else:
+            raise TypeError(
+                "Wrong image type: {0}, use numpy ndarray or"
+                "arrayfire Array".format(type(image))
+            )
+
         self.image = image
+
+    def setBackend(self, backend: str):
+        "Set backend either numpy or arrayfire"
+        assert backend == "numpy" or backend == "arrayfire"
+        if self.backend == backend:
+            pass
+        elif self.backend == "numpy":
+            self.image = af.np_to_af_array(self.image)
+        elif self.backend == "arrayfire":
+            self.image = self.image.to_ndarray()
+        self.backend = backend
 
     @property
     def norm_coordinates(self):
         "Get normalized coordinates of the image pixels"
         # pdb.set_trace()
         rownb, colnb = self.image.shape[0], self.image.shape[1]
-        norm = np.empty_like(self.coordinates, dtype=np.float32)
+        if self.backend == "numpy":
+            norm = np.empty_like(self.coordinates, dtype=np.float32)
+        elif self.backend == "arrayfire":
+            norm = af.Array(None, self.coordinates.shape,
+                            dtype=af.Dtype.f32)
         norm[:, 0] = self.coordinates[:, 0] / rownb
         norm[:, 1] = self.coordinates[:, 1] / colnb
         return norm
@@ -233,7 +478,10 @@ class ImageArray:
         rownb, colnb = self.image.shape[:2]
         coords = [[(row, col) for col in range(colnb)] for row in range(rownb)]
         coordarray = np.array(coords)
-        return coordarray.reshape((-1, 2))
+        coordarray = coordarray.reshape((-1, 2))
+        if self.backend == 'arrayfire':
+            coordarray = af.np_to_af_array(coordarray)
+        return coordarray
 
     @property
     def arrshape(self):
@@ -243,19 +491,59 @@ class ImageArray:
     @property
     def flatarr(self):
         "get flattened array"
-        return self.image.flatten()
+        res = None
+        if self.backend == "numpy":
+            res = self.image.flatten()
+        else:
+            res = af.data.flat(self.image)
+        return res
+
+    @property
+    def flatimg(self):
+        "Flatten image keep color channels"
+        res = None
+        if self.backend == "numpy":
+            rownb, colnb = self.image.shape[:2]
+            res = self.image.reshape((rownb * colnb, 3))
+        elif self.backend == "arrayfire":
+            rownb, colnb = self.image.shape[:2]
+            res = af.data.moddims(self.image.copy(), rownb * colnb, 3)
+        #
+        return res
+
 
 
 def interpolateImage(imarr: ImageArray):
     "Interpolate image array"
-    imshape = imarr.image.shape
-    newimage = imarr.image.flatten()
-    newimage = np.uint8(np.interp(newimage,
-                                  (newimage.min(),
-                                   newimage.max()),
-                                  (0, 255))
-                        )
-    newimage = newimage.reshape(imshape)
+    imshape = imarr.arrshape
+    newimage = imarr.flatarr
+    if imarr.backend == "numpy":
+        newimage = np.uint8(np.interp(newimage,
+                                      (newimage.min(),
+                                       newimage.max()),
+                                      (0, 255))
+                            )
+        newimage = newimage.reshape(imshape)
+    else:
+
+        interpim = remap(newimage, 0, 255)
+        shapelen = len(imshape)
+        if shapelen == 2:
+            newimage = af.data.moddims(interpim,
+                                       imshape[0],
+                                       imshape[1])
+        elif shapelen == 3:
+            newimage = af.data.moddims(interpim,
+                                       imshape[0],
+                                       imshape[1],
+                                       imshape[2])
+        elif shapelen == 4:
+            newimage = af.data.moddims(interpim,
+                                       imshape[0],
+                                       imshape[1],
+                                       imshape[2],
+                                       imshape[3])
+
     return ImageArray(newimage)
 
 
@@ -294,10 +582,9 @@ class ChannelShader:
     "Shades channels"
 
     def __init__(self,
-                 coordarr: np.ndarray,
+                 imarr: ImageArray,
                  light_source: LightSource,  # has I_a, I_p, k_a
                  surface_normal: np.ndarray,
-                 color: np.ndarray,  # they are assumed to be O_d and O_s
                  spec_coeff=0.1,  # k_s
                  spec_color=1.0,  # O_s: obj specular color. It can be
                  # optimized with respect to surface material
@@ -309,17 +596,21 @@ class ChannelShader:
                  attenuation_c3=0.0,  # f_attr c3 d_L^2 coefficient
                  shininess=20.0  # n
                  ):
+        self.imarr = imarr
         self.light_source = light_source
         self.light_intensity = self.light_source.intensity  # I_p
         self.ambient_coefficient = self.light_source.ambient_coefficient  # k_a
         self.ambient_intensity = self.light_source.ambient_intensity  # I_a
-        self.coordarr = coordarr
-        self.surface_normal = np.copy(surface_normal)
+        self.coordarr = imarr.coordinates
+        if imarr.backend == "arrayfire":
+            self.surface_normal = af.np_to_af_array(np.copy(surface_normal))
+        else:
+            self.surface_normal = np.copy(surface_normal)
         self.screen_gamma = screen_gamma
         self.shininess = shininess
         self.diffuse_coeff = diffuse_coeff  # k_d
         # self.diffuse_color = normalize_1d_array(color)  # O_d: obj diffuse color
-        self.diffuse_color = color  # O_d: obj diffuse color
+        self.diffuse_color = imarr.flatarr  # O_d: obj diffuse color
         self.spec_color = spec_color  # O_s
         self.spec_coeff = spec_coeff  # k_s: specular coefficient
         self.att_c1 = attenuation_c1
@@ -505,6 +796,196 @@ class Shader:
             return self.shade_blinn_phong()
 
 
+class ShaderImArray:
+    "Shader based on image array"
+
+    def __init__(self,
+                 imarr: ImageArray,
+                 light_source: LightSource,  # has I_a, I_p, k_a
+                 surface_normal: np.ndarray,
+                 spec_coeff=0.1,  # k_s
+                 spec_color=1.0,  # O_s: obj specular color. It can be
+                 # optimized with respect to surface material
+                 screen_gamma=2.2,
+                 diffuse_coeff=0.008,  # k_d
+                 # a good value is between 0.007 and 0.1
+                 attenuation_c1=1.0,  # f_attr c1
+                 attenuation_c2=0.0,  # f_attr c2 d_L coefficient
+                 attenuation_c3=0.0,  # f_attr c3 d_L^2 coefficient
+                 shininess=20.0  # n
+                 ):
+        self.imarr = imarr
+        if imarr.backend == "numpy":
+            pass
+        elif imarr.backend == "arrayfire":
+            pass
+        else:
+            raise NotImplemented("Backend {0} not implemented by the"
+                                 "shader".format(imarr.backend)
+                                 )
+
+        self.light_source = light_source
+        self.light_intensity = self.light_source.intensity  # I_p
+        self.ambient_coefficient = self.light_source.ambient_coefficient  # k_a
+        self.ambient_intensity = self.light_source.ambient_intensity  # I_a
+        self.coordarr = imarr.coordinates
+        if imarr.backend == "arrayfire":
+            self.surface_normals = af.np_to_af_array(np.copy(surface_normal))
+        elif imarr.backend == "numpy":
+            self.surface_normals = np.copy(surface_normal)
+        self.screen_gamma = screen_gamma
+        self.shininess = shininess
+        self.diffuse_coeff = diffuse_coeff  # k_d
+        # self.diffuse_color = normalize_1d_array(color)  # O_d: obj diffuse color
+        self.diffuse_color = imarr.flatimg  # O_d: obj diffuse color
+        self.spec_color = spec_color  # O_s
+        self.spec_coeff = spec_coeff  # k_s: specular coefficient
+        self.att_c1 = attenuation_c1
+        self.att_c2 = attenuation_c2
+        self.att_c3 = attenuation_c3
+
+    @property
+    def distance(self):
+        yarr = self.coordarr[:, 0]  # row nb
+        xarr = self.coordarr[:, 1]  # col nb
+        xdist = (self.light_source.x - xarr)**2
+        ydist = (self.light_source.y - yarr)**2
+        return xdist + ydist
+
+    @property
+    def light_direction(self):
+        "get light direction matrix (-1, 3)"
+        yarr = self.coordarr[:, 0]
+        xarr = self.coordarr[:, 1]
+        xdiff = self.light_source.x - xarr
+        ydiff = self.light_source.y - yarr
+        light_matrix = empty_arr((self.coordarr.shape[0], 3),
+                                 self.imarr.backend)
+        light_matrix[:, 0] = ydiff
+        light_matrix[:, 1] = xdiff
+        light_matrix[:, 2] = self.light_source.z
+        # light_matrix[:, 2] = 0.0
+        # pdb.set_trace()
+        return light_matrix
+
+    @property
+    def light_attenuation(self):
+        """
+        Implementing from Foley JD 1996, p. 726
+
+        f_att : light source attenuation function:
+        f_att = min(\frac{1}{c_1 + c_2{\times}d_L + c_3{\times}d^2_{L}} , 1)
+        """
+        second = self.att_c2 * self.distance
+        third = self.att_c3 * self.distance * self.distance
+        result = self.att_c1 + second + third
+        result = 1 / result
+        result = fill_arr(result, result < 1,
+                          fillval=1,
+                          backend=self.imarr.backend)
+        return result
+
+    @property
+    def normalized_light_direction(self):
+        "Light Direction matrix normalized"
+        return normalize_3col_array(self.light_direction)
+
+    @property
+    def normalized_surface_normal(self):
+        # pdb.set_trace()
+        norm_surface = normalize_rows_3col_array(self.surface_normals)
+        return norm_surface
+
+    @property
+    def costheta(self):
+        "set costheta"
+        # pdb.set_trace()
+        costheta = get_matrix_to_vector_dot(
+            vec=self.normalized_light_direction,
+            mat=self.normalized_surface_normal)
+        # products of vectors
+        # costheta = np.abs(costheta)  # as per (Foley J.D, et.al. 1996, p. 724)
+        # pdb.set_trace()
+        costheta = fill_arr(costheta, costheta > 0,
+                            fillval=0, backend=self.imarr.backend)
+        # pdb.set_trace()
+        return costheta
+
+    @property
+    def ambient_term(self):
+        "Get the ambient term I_a * k_a * O_d"
+        term = self.ambient_coefficient * self.ambient_intensity
+        term *= self.diffuse_color
+        # pdb.set_trace()
+        return term
+
+    @property
+    def view_direction(self):
+        "Get view direction"
+        cshape = self.coordarr.shape
+        cdtype = self.coordarr.dtype
+        coord = empty_arr((cshape[0], 3), self.imarr.backend)
+        if self.imarr.backend == "numpy":
+            coord[:, :2] = -self.coordarr
+        elif self.imarr.backend == "arrayfire":
+            coord[:, :2] = -self.coordarr
+            coord[:, 2] = 0.0  # viewer at infinity
+        coord = normalize_3col_array(coord)
+        return coord
+
+    @property
+    def half_direction(self):
+        "get half direction"
+        # pdb.set_trace()
+        arr = self.view_direction + self.normalized_light_direction
+        return normalize_3col_array(arr)
+
+    @property
+    def spec_angle(self):
+        "get spec angle"
+        # pdb.set_trace()
+        specAngle = get_matrix_to_vector_dot(
+            vec=self.half_direction,
+            mat=self.normalized_surface_normal)
+        specAngle = fill_arr(specAngle, specAngle > 0.0,
+                             fillval=0, backend=self.imarr.backend)
+
+        return specAngle
+
+    @property
+    def specular(self):
+        return self.spec_angle ** self.shininess
+
+    @property
+    def color_blinn_phong(self):
+        """compute new channel color intensities
+        Implements: Foley J.D. 1996 p. 730 - 731, variation on equation 16.15
+        """
+        second = 1.0  # added for structuring code in this fashion, makes
+        # debugging easier
+        # lambertian terms
+        second *= self.diffuse_coeff  # k_d
+        second *= self.costheta  # (N \cdot L)
+        second *= self.light_intensity  # I_p
+        # adding phong terms
+        second = mul_matcols2vec(second, self.light_attenuation)  # f_attr
+        # pdb.set_trace()
+        second *= self.diffuse_color  # O_d
+        third = 1.0
+        third *= self.spec_color  # O_s
+        # pdb.set_trace()
+        third *= self.specular  # (N \cdot H)^n
+        # pdb.set_trace()
+        third *= self.spec_coeff  # k_s
+        result = 0.0
+        #
+        result += self.ambient_term  # I_a × k_a × O_d
+        result += second
+        result += third
+        # pdb.set_trace()
+        return result
+
+
 class RGBPTM:
     "Regroups methods on rgb ptm"
 
@@ -653,7 +1134,7 @@ class RGBPTM:
     @property
     def image(self):
         "Get image"
-        return np.fliplr(self.imarr.image)
+        return self.imarr.image
 
     def get_light_dirU_vec(self, coeffarr: np.ndarray):
         """
@@ -764,7 +1245,7 @@ class PTMHandler:
         shaded = shaded.reshape(imshape)
         imarr = ImageArray(shaded)
         imarr = interpolateImage(imarr)
-        return np.fliplr(imarr.image)
+        return imarr.image
 
     def change_diffuse_gain(self, g: float,
                             coeffarr: np.ndarray):
@@ -841,36 +1322,34 @@ class PTMHandler:
         pass
 
 
-def setUpHandler(ptmpath: str):
-    "From parse ptm file from path and setup ptm handler"
-    parser = PTMFileParse(ptmpath)
-    out = parser.parse()
-    ptm = RGBPTM(
-        coeffarr=out['coeffarr'],
-        image_height=out['image_height'],
-        image_width=out['image_width'],
-        scales=out['scales'],
-        biases=out['biases'])
-    light_source = LightSource(x=float(out['image_width']),
-                               y=float(out['image_height']),
-                               ambient_coefficient=0.000000002,  # k_a
-                               )
-    coordarr = ptm.imarr.coordinates
-    # pdb.set_trace()
-    red_shader = ChannelShader(coordarr,
-                               light_source,
-                               color=ptm.red_channel_normalized_pixel_values,
-                               surface_normal=ptm.red_channel_surface_normal)
-    green_shader = ChannelShader(coordarr,
-                                 light_source,
-                                 imagesize=ptm.imarr.image.shape[:2],
-                                 color=ptm.green_channel_normalized_pixel_values,
-                                 surface_normal=ptm.green_channel_surface_normal)
-    blue_shader = ChannelShader(coordarr,
-                                light_source,
-                                imagesize=ptm.imarr.image.shape[:2],
-                                color=ptm.blue_channel_normalized_pixel_values,
-                                surface_normal=ptm.blue_channel_surface_normal)
-    shader = Shader(red_shader, green_shader, blue_shader)
-    handler = PTMHandler(ptm, shader, light_source)
-    return handler
+# def setUpHandler(ptmpath: str):
+#     "From parse ptm file from path and setup ptm handler"
+#     parser = PTMFileParse(ptmpath)
+#     out = parser.parse()
+#     ptm = RGBPTM(
+#         coeffarr=out['coeffarr'],
+#         image_height=out['image_height'],
+#         image_width=out['image_width'],
+#         scales=out['scales'],
+#         biases=out['biases'])
+#     light_source = LightSource(x=float(out['image_width']),
+#                                y=float(out['image_height']),
+#                                ambient_coefficient=0.000000002,  # k_a
+#                                )
+#     coordarr = ptm.imarr.coordinates
+#     # pdb.set_trace()
+#     red_shader = ChannelShader(imarr=ptm.imarr,
+#                                light_source,
+#                                color=ptm.red_channel_normalized_pixel_values,
+#                                surface_normal=ptm.red_channel_surface_normal)
+#     green_shader = ChannelShader(coordarr,
+#                                  light_source,
+#                                  color=ptm.green_channel_normalized_pixel_values,
+#                                  surface_normal=ptm.green_channel_surface_normal)
+#     blue_shader = ChannelShader(coordarr,
+#                                 light_source,
+#                                 color=ptm.blue_channel_normalized_pixel_values,
+#                                 surface_normal=ptm.blue_channel_surface_normal)
+#     shader = Shader(red_shader, green_shader, blue_shader)
+#     handler = PTMHandler(ptm, shader, light_source)
+#     return handler
