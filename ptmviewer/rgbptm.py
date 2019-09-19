@@ -19,7 +19,9 @@ class RGBPTM(PTMFileParse):
         self.coefficients = self.ptmfile["coeffarr"]
         self.imcoeffs = self.coefficients.reshape((3, self.imheight * self.imwidth, 6))
         self.normal = None
+        self.image = None
         self.setSurfaceNormal()
+        self.setImage()
 
     def get_light_dirU_vec(self, coeffarr: np.ndarray):
         """
@@ -96,9 +98,9 @@ class RGBPTM(PTMFileParse):
         bnorm = self.get_surface_normal(self.imcoeffs[2, :, :])
         nshape = rnorm.shape
         normals = np.empty((3, *nshape), dtype=np.float64)
-        normals[0, :] = self.red_channel_surface_normal
-        normals[1, :] = self.green_channel_surface_normal
-        normals[2, :] = self.blue_channel_surface_normal
+        normals[0, :] = rnorm
+        normals[1, :] = gnorm
+        normals[2, :] = bnorm
         self.normal = normals
         return normals
 
@@ -107,6 +109,7 @@ class RGBPTM(PTMFileParse):
         nr = self.normal[0, :]
         ng = self.normal[1, :]
         nb = self.normal[2, :]
+        nshape = nr.shape
         normals = np.empty((3, *nshape), dtype=np.uint8)
         norm1 = np.interp(nr, (nr.min(), nr.max()), (0, 255))
         norm2 = np.interp(ng, (ng.min(), ng.max()), (0, 255))
@@ -115,4 +118,19 @@ class RGBPTM(PTMFileParse):
         normals[1, :] = norm2
         normals[2, :] = norm3
         return Image.fromarray(normals)
+
+    def setImage(self):
+        "set image rgb values"
+        image = np.empty((self.imheight, self.imwidth, 3), dtype=np.uint8)
+        blue = self.get_channel_intensity(self.imcoeffs[2, :])
+        red = self.get_channel_intensity(self.imcoeffs[0, :])
+        green = self.get_channel_intensity(self.imcoeffs[1, :])
+        image[:, :, 0] = np.interp(red, (red.min(), red.max()), (0, 255))
+        image[:, :, 1] = np.interp(green, (green.min(), green.max()), (0, 255))
+        image[:, :, 2] = np.interp(blue, (blue.min(), blue.max()), (0, 255))
+        self.image = image
+        return
+
+    def getImage(self):
+        return Image.fromarray(self.image)
 

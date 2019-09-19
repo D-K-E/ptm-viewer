@@ -56,7 +56,7 @@ class PtmGLWidget(QOpenGLWidget):
     "qopengl widget"
 
     def __init__(self, surfaceNormals: QImage, texture: QImage, parent=None):
-        QOpenGLWidget.__init__(parent)
+        QOpenGLWidget.__init__(self, parent)
 
         # camera
         self.camera = QtCamera()

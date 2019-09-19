@@ -11,6 +11,7 @@ from shiboken2 import VoidPtr
 import numpy as np
 import sys
 import os
+from PIL import Image, ImageQt
 
 from ptmviewer.interface.window import Ui_MainWindow
 from ptmviewer.glwidget import PtmGLWidget
@@ -41,10 +42,29 @@ class AppWindowFinal(AppWindowInit):
         # Main Window Events
         self.main_window.setWindowTitle("Python PTM Viewer")
         self.main_window.closeEvent = self.closeApp
+        self.closeShort = QtWidgets.QShortcut(QtGui.QKeySequence("ctrl+w"),
+                self.main_window)
+        self.closeShort.activated.connect(self.closeKey)
+        # self.main_window.setShortcut("ctrl+w")
 
         # Button related events
         self.addFile.clicked.connect(self.browseFolder)
         self.addFile.setShortcut("ctrl+o")
+
+        self.loadFile.clicked.connect(self.loadPtm)
+
+    # Ptm related stuff
+    def loadPtm(self):
+        "load ptm file into gl widget"
+        citem = self.fileList.currentItem()
+        cindex = self.fileList.indexFromItem(citem)
+        ptmobj = self.ptmfiles[cindex]
+        ptm = RGBPTM(ptmobj["path"])
+        nimg = ptm.getNormalMap()
+        nimgQt = ImageQt.ImageQt(nimg)
+        texture = ptm.getImage()
+        textureQt = ImageQt.ImageQt(texture)
+        self.glwidget = PtmGLWidget(surfaceNormals=nimgQt, texture=textureQt)
 
     ### Standard Gui Elements ###
 
@@ -60,15 +80,15 @@ class AppWindowFinal(AppWindowInit):
         )
         if fdir:
             for fname in fdir[0]:
-                ptmitem = QtWidgets.QListWidgetItem(self.listWidget)
+                ptmitem = QtWidgets.QListWidgetItem(self.fileList)
                 itemname = os.path.basename(fname)
                 ptmitem.setText(itemname)
                 ptmobj = {}
                 ptmobj["path"] = fname
                 ptmobj["name"] = itemname
-                ptmobj["index"] = self.listWidget.indexFromItem(ptmitem)
+                ptmobj["index"] = self.fileList.indexFromItem(ptmitem)
                 self.ptmfiles[ptmobj["index"]] = ptmobj
-                self.listWidget.sortItems()
+                self.fileList.sortItems()
 
     def closeApp(self, event):
         "Close application"
@@ -87,6 +107,9 @@ class AppWindowFinal(AppWindowInit):
             event.ignore()
             #
         return
+
+    def closeKey(self):
+        sys.exit(0)
 
 
 if __name__ == "__main__":
