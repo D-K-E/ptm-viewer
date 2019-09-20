@@ -36,14 +36,13 @@ class AppWindowFinal(AppWindowInit):
     def __init__(self):
         super().__init__()
         self.ptmfiles = {}
-        # gl widget
-        self.glwidget = None
 
         # Main Window Events
         self.main_window.setWindowTitle("Python PTM Viewer")
         self.main_window.closeEvent = self.closeApp
-        self.closeShort = QtWidgets.QShortcut(QtGui.QKeySequence("ctrl+w"),
-                self.main_window)
+        self.closeShort = QtWidgets.QShortcut(
+            QtGui.QKeySequence("ctrl+w"), self.main_window
+        )
         self.closeShort.activated.connect(self.closeKey)
         # self.main_window.setShortcut("ctrl+w")
 
@@ -52,6 +51,34 @@ class AppWindowFinal(AppWindowInit):
         self.addFile.setShortcut("ctrl+o")
 
         self.loadFile.clicked.connect(self.loadPtm)
+        self.loadFile.setShortcut("ctrl+l")
+
+        # lights
+        self.lightRed.valueChanged.connect(self.changeLightColor)
+        self.lightGreen.valueChanged.connect(self.changeLightColor)
+        self.lightBlue.valueChanged.connect(self.changeLightColor)
+        self.rotLightX.valueChanged.connect(self.rotateLights)
+        self.rotLightY.valueChanged.connect(self.rotateLights)
+        self.rotLightZ.valueChanged.connect(self.rotateLights)
+        self.lightMoveUp.clicked.connect(self.moveLightPosForward)
+        self.lightMoveDown.clicked.connect(self.moveLightPosBackward)
+        self.lightMoveLeft.clicked.connect(self.moveLightPosLeft)
+        self.lightMoveRight.clicked.connect(self.moveLightPosRight)
+
+        # camera
+        self.rotCamX.valueChanged.connect(self.turnCameraX)
+        self.rotCamY.valueChanged.connect(self.turnCameraY)
+        self.camMoveUp.clicked.connect(self.moveCameraForward)
+        self.camMoveDown.clicked.connect(self.moveCameraBackward)
+        self.camMoveLeft.clicked.connect(self.moveCameraLeft)
+        self.camMoveRight.clicked.connect(self.moveCameraRight)
+
+        self.lastCamXVal = self.rotCamX.value()
+        self.lastCamYVal = self.rotCamY.value()
+
+        # angle shininess, ambient coeff
+        self.rotAngle.valueChanged.connect(self.setAngle)
+        self.shinSpin.valueChanged.connect(self.setShininess)
 
     # Ptm related stuff
     def loadPtm(self):
@@ -64,7 +91,110 @@ class AppWindowFinal(AppWindowInit):
         nimgQt = ImageQt.ImageQt(nimg)
         texture = ptm.getImage()
         textureQt = ImageQt.ImageQt(texture)
-        self.glwidget = PtmGLWidget(surfaceNormals=nimgQt, texture=textureQt)
+        self.viewerWidget = PtmGLWidget(surfaceNormals=nimgQt, texture=textureQt)
+        info = self.viewerWidget.getGLInfo()
+        self.statusbar.showMessage(info, 5000)
+        self.viewerWidget.makeCurrent()
+        self.viewerWidget.initializeGL()
+        self.viewerWidget.paintGL()
+
+    def moveGLCamera(self, direction: str):
+        self.viewerWidget.moveCamera(direction)
+
+    def moveCameraForward(self):
+        self.moveGLCamera("forward")
+
+    def moveCameraBackward(self):
+        self.moveGLCamera("backward")
+
+    def moveCameraLeft(self):
+        self.moveGLCamera("left")
+
+    def moveCameraRight(self):
+        self.moveGLCamera("right")
+
+    def turnCameraX(self, newVal: int):
+        "Turn camera around"
+        offsetx = newVal - self.lastCamXVal
+        valy = self.rotCamY.value() - self.lastCamYVal
+        self.viewerWidget.turnAround(x=float(offsetx), y=float(valy))
+        self.lastCamXVal = newVal
+
+    def turnCameraY(self, newVal: int):
+        "Turn camera around"
+        offsety = newVal - self.lastCamYVal
+        valx = self.rotCamX.value() - self.lastCamXVal
+        self.viewerWidget.turnAround(x=float(valx), y=float(offsety))
+        self.lastCamYVal = newVal
+
+    def setAngle(self):
+        angl = self.rotAngle.value()
+        self.viewerWidget.setRotationAngle(angl)
+
+    def setShininess(self):
+        shin = self.shinSpin.value()
+        self.viewerWidget.changeShininess(shin)
+
+    def setAmbientCoeff(self):
+        "set ambient coefficient to gl widget"
+        val = self.ambientCoeff.value()
+        self.viewerWidget.changeAmbientCoeffs(val)
+
+    def moveLightPosForward(self):
+        ""
+        offsetx = 0.0
+        offsety = 0.0
+        offsetz = -0.5
+        self.viewerWidget.moveLight(xoffset=offsetx, yoffset=offsety, zoffset=offsetz)
+
+    def moveLightPosBackward(self):
+        ""
+        offsetx = 0.0
+        offsety = 0.0
+        offsetz = 0.5
+        self.viewerWidget.moveLight(xoffset=offsetx, yoffset=offsety, zoffset=offsetz)
+
+    def moveLightPosLeft(self):
+        ""
+        offsetx = -1.0
+        offsety = 0.0
+        offsetz = 0.0
+        self.viewerWidget.moveLight(xoffset=offsetx, yoffset=offsety, zoffset=offsetz)
+
+    def moveLightPosRight(self):
+        ""
+        offsetx = 0.5
+        offsety = 0.0
+        offsetz = 0.0
+        self.viewerWidget.moveLight(xoffset=offsetx, yoffset=offsety, zoffset=offsetz)
+
+    def moveLightPosUp(self):
+        ""
+        offsetx = 0.0
+        offsety = 0.5
+        offsetz = 0.0
+        self.viewerWidget.moveLight(xoffset=offsetx, yoffset=offsety, zoffset=offsetz)
+
+    def moveLightPosDown(self):
+        ""
+        offsetx = 0.0
+        offsety = -0.5
+        offsetz = 0.0
+        self.viewerWidget.moveLight(xoffset=offsetx, yoffset=offsety, zoffset=offsetz)
+
+    def rotateLights(self):
+        rx = self.rotLightX.value()
+        ry = self.rotLightY.value()
+        rz = self.rotLightZ.value()
+        self.viewerWidget.rotateLight(rx, ry, rz)
+
+    def changeLightColor(self):
+        diffr = self.lightRed.value()
+        diffg = self.lightGreen.value()
+        diffb = self.lightBlue.value()
+        self.viewerWidget.changeLampIntensity(channel="red", val=diffr)
+        self.viewerWidget.changeLampIntensity(channel="green", val=diffg)
+        self.viewerWidget.changeLampIntensity(channel="blue", val=diffb)
 
     ### Standard Gui Elements ###
 

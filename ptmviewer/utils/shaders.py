@@ -6,11 +6,11 @@ objectVshader = """
 #version 330 core
 
 // specify input
-in highp vec3 aPos;
-in highp vec3 aNormal;
-in highp vec2 aTexCoord;
-in highp vec3 aTangent;
-in highp vec3 aBiTangent;
+layout (location = 0) in vec3 aPos;
+layout (location = 1) in vec3 aNormal;
+layout (location = 2) in vec2 aTexCoord;
+layout (location = 3) in vec3 aTangent;
+layout (location = 4) in vec3 aBiTangent;
 
 // specify output
 out vec3 FragPos;
@@ -23,8 +23,8 @@ uniform mat4 projection;
 uniform mat4 view;
 uniform mat4 model;
 
-uniform highp vec3 lightPos;
-uniform highp vec3 viewPos;
+uniform vec3 lightPos;
+uniform vec3 viewPos;
 
 // function
 
@@ -46,7 +46,7 @@ void main()
     TangentLightPos = TBN * lightPos;
     TangentViewPos = TBN * viewPos;
     TangentFragPos = TBN * FragPos;
-    gl_Position = projection * view * model * vec4(model, 1.0);
+    gl_Position = projection * view * model * vec4(aPos, 1.0);
 }
 """
 
@@ -58,15 +58,17 @@ in vec3 TangentLightPos;
 in vec3 TangentViewPos;
 in vec3 TangentFragPos;
 
+out vec4 FragColor;
+
 uniform sampler2D diffuseMap; // object colors per fragment
 uniform sampler2D normalMap; // normals per vertex
 
 uniform float ambientCoeff;
 uniform float shininess;
 
-uniform highp vec3 lightPos;
-uniform highp vec3 lightColor;
-uniform highp vec3 viewPos;
+uniform vec3 lightPos;
+uniform vec3 lightColor;
+uniform vec3 viewPos;
 
 void main()
 {
@@ -104,7 +106,7 @@ void main()
 
 lampVshader = """
 #version 330 core
-in mediump vec3 aPos;
+layout (location = 0) in vec3 aPos;
 
 uniform mat4 projection;
 uniform mat4 view;
@@ -112,7 +114,7 @@ uniform mat4 model;
 
 void main()
 {
-    gl_Position = projection * view * model * vec4(model, 1.0);
+    gl_Position = projection * view * model * vec4(aPos, 1.0);
 }
 """
 
@@ -120,7 +122,7 @@ lampFshader = """
 #version 330 core
 out vec4 FragColor;
 
-in lowp vec3 lightColor;
+uniform lowp vec3 lightColor;
 
 void main()
 {
@@ -129,6 +131,6 @@ void main()
 """
 
 shaders = {
-    "object": {"fragment": objectFshader, "vertex": objectVshader},
+    "quad": {"fragment": objectFshader, "vertex": objectVshader},
     "lamp": {"fragment": lampFshader, "vertex": lampVshader},
 }

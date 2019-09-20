@@ -34,15 +34,15 @@
       <item>
        <widget class="QToolBox" name="toolBox">
         <property name="currentIndex">
-         <number>1</number>
+         <number>0</number>
         </property>
         <widget class="QWidget" name="ViewerPage">
          <property name="geometry">
           <rect>
            <x>0</x>
            <y>0</y>
-           <width>305</width>
-           <height>703</height>
+           <width>367</width>
+           <height>624</height>
           </rect>
          </property>
          <attribute name="label">
@@ -142,6 +142,33 @@
               </item>
               <item>
                <layout class="QHBoxLayout" name="horizontalLayout_11">
+                <item>
+                 <layout class="QVBoxLayout" name="verticalLayout_23">
+                  <item>
+                   <widget class="QLabel" name="label_18">
+                    <property name="text">
+                     <string>Angle</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QDoubleSpinBox" name="rotAngle">
+                    <property name="minimum">
+                     <double>1.000000000000000</double>
+                    </property>
+                    <property name="maximum">
+                     <double>360.000000000000000</double>
+                    </property>
+                    <property name="singleStep">
+                     <double>0.100000000000000</double>
+                    </property>
+                    <property name="value">
+                     <double>45.000000000000000</double>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </item>
                 <item>
                  <layout class="QVBoxLayout" name="verticalLayout" stretch="0,1">
                   <item>
@@ -442,8 +469,8 @@
           <rect>
            <x>0</x>
            <y>0</y>
-           <width>278</width>
-           <height>624</height>
+           <width>241</width>
+           <height>179</height>
           </rect>
          </property>
          <attribute name="label">

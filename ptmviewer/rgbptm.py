@@ -6,6 +6,7 @@ from ptmviewer.ptmparser import PTMFileParse
 
 import numpy as np
 from PIL import Image
+import pdb
 
 
 class RGBPTM(PTMFileParse):
@@ -93,30 +94,19 @@ class RGBPTM(PTMFileParse):
 
     def setSurfaceNormal(self):
         "Set surface normal values to ptm"
-        rnorm = self.get_surface_normal(self.imcoeffs[0, :, :])
-        gnorm = self.get_surface_normal(self.imcoeffs[1, :, :])
-        bnorm = self.get_surface_normal(self.imcoeffs[2, :, :])
-        nshape = rnorm.shape
-        normals = np.empty((3, *nshape), dtype=np.float64)
-        normals[0, :] = rnorm
-        normals[1, :] = gnorm
-        normals[2, :] = bnorm
+        coeffs = self.imcoeffs.reshape((-1, 6))
+        normals = self.get_surface_normal(coeffs)
         self.normal = normals
         return normals
 
     def getNormalMap(self):
         "get normal map for surface normals"
-        nr = self.normal[0, :]
-        ng = self.normal[1, :]
-        nb = self.normal[2, :]
+        nr = self.normal
         nshape = nr.shape
-        normals = np.empty((3, *nshape), dtype=np.uint8)
+        pdb.set_trace()
+        nr = np.interp(nr, (nr.min(), nr.max()), (-1, 1))
         norm1 = np.interp(nr, (nr.min(), nr.max()), (0, 255))
-        norm2 = np.interp(ng, (ng.min(), ng.max()), (0, 255))
-        norm3 = np.interp(nb, (nb.min(), nb.max()), (0, 255))
-        normals[0, :] = norm1
-        normals[1, :] = norm2
-        normals[2, :] = norm3
+        normals = norm1.reshape((self.imheight, self.imwidth, 3))
         return Image.fromarray(normals)
 
     def setImage(self):
