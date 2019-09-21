@@ -12,6 +12,7 @@ from PySide2.QtGui import QOpenGLVertexArrayObject
 from PySide2.QtGui import QOpenGLBuffer
 from PySide2.QtGui import QOpenGLShaderProgram
 from PySide2.QtGui import QOpenGLShader
+from PySide2.QtGui import QOpenGLTexture
 from PySide2.QtGui import QOpenGLContext
 from PySide2.QtGui import QMatrix4x4
 from PySide2.QtGui import QVector4D
@@ -46,7 +47,9 @@ except ImportError:
         "PyOpenGL must be installed to run this example.",
         QtWidgets.QMessageBox.Close,
     )
-    messageBox.setDetailedText("Run:\npip install PyOpenGL PyOpenGL_accelerate")
+    messageBox.setDetailedText(
+        "Run:\npip install PyOpenGL PyOpenGL_accelerate"
+    )
     messageBox.exec_()
     sys.exit(1)
 
@@ -56,9 +59,15 @@ from PySide2.QtWidgets import QOpenGLWidget
 class PtmGLWidget(QOpenGLWidget):
     "OpenGL widget"
 
-    def __init__(self, surfaceNormals: QImage, texture: QImage, parent=None):
+    def __init__(
+        self,
+        surfaceNormalR: QImage,
+        surfaceNormalG: QImage,
+        surfaceNormalB: QImage,
+        texture: QImage,
+        parent=None,
+    ):
         QOpenGLWidget.__init__(self, parent)
-
         # camera
         self.camera = QtCamera()
         self.camera.position = QVector3D(0.0, 0.0, 3.0)
@@ -91,13 +100,31 @@ class PtmGLWidget(QOpenGLWidget):
         self.lampVbo = QOpenGLBuffer(QOpenGLBuffer.VertexBuffer)
         self.program = QOpenGLShaderProgram()
         self.lampProgram = QOpenGLShaderProgram()
-        self.diffuseMap = None  # texture
+        self.diffuseMap = {
+            "texture": None,
+            "unit": 3,
+            "data": texture.mirrored(),
+        }  # texture
         self.specularMap = None  # texture
-        self.texUnit1 = 0
-        self.texUnit2 = 1
+        self.normalMaps = {
+            "r": {
+                "texture": None,
+                "unit": 0,
+                "data": surfaceNormalR.mirrored(),
+            },
+            "g": {
+                "texture": None,
+                "unit": 1,
+                "data": surfaceNormalG.mirrored(),
+            },
+            "b": {
+                "texture": None,
+                "unit": 2,
+                "data": surfaceNormalB.mirrored(),
+            },
+        }  # texture
         # texture
         self.textureImage = texture.mirrored()
-        self.textureNormals = surfaceNormals.mirrored()
         imrect = self.textureImage.rect()
         imwidth = imrect.width()
         imheight = imrect.height()
@@ -125,7 +152,7 @@ class PtmGLWidget(QOpenGLWidget):
 
         self.textureCoordCorner1 = QVector2D(0.0, 1.0)
         self.textureCoordCorner2 = QVector2D(0.0, 0.0)
-        self.textureCoordCorner3 = QVector2D(1.0, 1.0)
+        self.textureCoordCorner3 = QVector2D(1.0, 0.0)
         self.textureCoordCorner4 = QVector2D(1.0, 1.0)
 
         self.firstTexTriangle = (
@@ -391,24 +418,36 @@ class PtmGLWidget(QOpenGLWidget):
         self.update()
 
     def diffuseMap_proc(self):
-        self.diffuseMap = QOpenGLTexture(QOpenGLTexture.Target2D)
-        self.diffuseMap.create()
-        self.diffuseMap.bind(self.texUnit1)
-        self.diffuseMap.setData(self.textureImage)
-        self.diffuseMap.setMinMagFilters(QOpenGLTexture.Nearest, QOpenGLTexture.Nearest)
-        self.diffuseMap.setWrapMode(QOpenGLTexture.DirectionS, QOpenGLTexture.Repeat)
-        self.diffuseMap.setWrapMode(QOpenGLTexture.DirectionT, QOpenGLTexture.Repeat)
+        self.diffuseMap["texture"] = QOpenGLTexture(QOpenGLTexture.Target2D)
+        self.diffuseMap["texture"].create()
+        self.diffuseMap["texture"].bind(self.diffuseMap["unit"])
+        self.diffuseMap["texture"].setData(self.diffuseMap["data"])
+        self.diffuseMap["texture"].setMinMagFilters(
+            QOpenGLTexture.Nearest, QOpenGLTexture.Nearest
+        )
+        self.diffuseMap["texture"].setWrapMode(
+            QOpenGLTexture.DirectionS, QOpenGLTexture.Repeat
+        )
+        self.diffuseMap["texture"].setWrapMode(
+            QOpenGLTexture.DirectionT, QOpenGLTexture.Repeat
+        )
 
     def normalMap_proc(self):
-        self.normalMap = QOpenGLTexture(QOpenGLTexture.Target2D)
-        self.normalMap.create()
-        self.normalMap.bind(self.texUnit2)
-        self.normalMap.setData(self.textureNormals)
-        self.normalMap.setMinMagFilters(
-            QOpenGLTexture.LinearMipMapLinear, QOpenGLTexture.Linear
-        )
-        self.normalMap.setWrapMode(QOpenGLTexture.DirectionS, QOpenGLTexture.Repeat)
-        self.normalMap.setWrapMode(QOpenGLTexture.DirectionT, QOpenGLTexture.Repeat)
+        "Procedure for creating and loading textures"
+        for channel, cdict in self.normalMaps.items():
+            cdict["texture"] = QOpenGLTexture(QOpenGLTexture.Target2D)
+            cdict["texture"].create()
+            cdict["texture"].bind(cdict["unit"])
+            cdict["texture"].setData(cdict["data"])
+            cdict["texture"].setMinMagFilters(
+                QOpenGLTexture.LinearMipMapLinear, QOpenGLTexture.Linear
+            )
+            cdict["texture"].setWrapMode(
+                QOpenGLTexture.DirectionS, QOpenGLTexture.Repeat
+            )
+            cdict["texture"].setWrapMode(
+                QOpenGLTexture.DirectionT, QOpenGLTexture.Repeat
+            )
 
     def computeTangentBiTangent(
         self,
@@ -482,7 +521,9 @@ class PtmGLWidget(QOpenGLWidget):
             bitangent.z(),
         )
 
-    def addQuadTriangle(self, vertices: list, textureTriangle, surfaceTriangle):
+    def addQuadTriangle(
+        self, vertices: list, textureTriangle, surfaceTriangle
+    ):
         "Add triangle to quad vertices"
         edge1 = surfaceTriangle[1] - surfaceTriangle[0]
         edge2 = surfaceTriangle[2] - surfaceTriangle[0]
@@ -509,6 +550,7 @@ class PtmGLWidget(QOpenGLWidget):
 
     def renderViewer(self):
         "Render viewer object with texture object"
+        funcs = self.context.functions()
         quadVertices = []
         quadVertices = self.addQuadTriangle(
             vertices=quadVertices,
@@ -523,17 +565,14 @@ class PtmGLWidget(QOpenGLWidget):
         quadVertices = np.array(quadVertices, dtype=ctypes.c_float)
         floatSize = ctypes.sizeof(ctypes.c_float)
         self.vbo.create()
-        self.vbo.bind()
-        self.vbo.allocate(quadVertices.tobytes(), floatSize * quadVertices.size)
         self.vao.create()
-        self.enableVaoAttribs()
+        #
         self.vao.bind()
-        funcs.glDrawArrays(pygl.GL_TRIANGLES, 0, 6)
-        self.vao.release()
-
-    def enableVaoAttribs(self):
-        "enable attributes of vao"
-        funcs = self.context.functions()
+        self.vbo.bind()
+        self.vbo.allocate(
+            quadVertices.tobytes(), floatSize * quadVertices.size
+        )
+        # self.enableVaoAttribs()
         rowsize = 0
         for key, valdi in self.attrLoc.items():
             rowsize += valdi["stride"]
@@ -549,6 +588,14 @@ class PtmGLWidget(QOpenGLWidget):
                 rowsize,
                 VoidPtr(valdi[ks[2]] * floatSize),
             )
+        self.vao.bind()
+        funcs.glDrawArrays(pygl.GL_TRIANGLES, 0, 6)
+        self.vao.release()
+
+    def enableVaoAttribs(self):
+        "enable attributes of vao"
+        funcs = self.context.functions()
+        floatSize = ctypes.sizeof(ctypes.c_float)
 
     def setObjectUniforms_proc(self):
         "Set object uniforms program"
@@ -576,13 +623,15 @@ class PtmGLWidget(QOpenGLWidget):
 
     def objectShader_init(self):
         "Object shader initialization"
-        shader = "quad"
+        shader = "quadPerChannel"
         vshader = self.loadVertexShader(shader, fromFile=False)
         fshader = self.loadFragmentShader(shader, fromFile=False)
         self.program.addShader(vshader)
         self.program.addShader(fshader)
+        for attr, adict in self.attrLoc.items():
+            self.program.bindAttributeLocation(attr, adict["layout"])
         linked = self.program.link()
-        print("quad shader linked: ", linked)
+        print(shader, "shader linked: ", linked)
 
     def lampShader_init(self):
         "Lamp shader initialization"
@@ -591,6 +640,10 @@ class PtmGLWidget(QOpenGLWidget):
         fshader = self.loadFragmentShader(shader, fromFile=False)
         self.lampProgram.addShader(vshader)
         self.lampProgram.addShader(fshader)
+        self.lampProgram.bindAttributeLocation(
+            "aPos", self.attrLoc["aPos"]["layout"]
+        )
+
         # lamp needs:
         # projection, view, model
         linked = self.lampProgram.link()
@@ -611,11 +664,26 @@ class PtmGLWidget(QOpenGLWidget):
         self.lampProgram.setUniformValue("model", model)
         self.lampProgram.setUniformValue("lightColor", self.lamp.color)
 
+    def bindTextures_proc(self):
+        "bind textures to context"
+        self.diffuseMap["texture"].bind()
+        for channel, cdict in self.normalMaps.items():
+            cdict["texture"].bind()
+
+    def releaseTextures_proc(self):
+        "release textures from context"
+        self.diffuseMap["texture"].release(self.diffuseMap["unit"])
+        for channel, cdict in self.normalMaps.items():
+            cdict["texture"].release(cdict["unit"])
+
     def cleanUpGL(self):
         "Clean up everything"
         self.context.makeCurrent()
+        self.releaseTextures_proc()
         del self.program
+        del self.lampProgram
         self.program = None
+        self.lampProgram = None
         self.doneCurrent()
 
     def resizeGL(self, width: int, height: int):
@@ -642,10 +710,17 @@ class PtmGLWidget(QOpenGLWidget):
         print("object init done")
         isb = self.program.bind()
         print("object shader bound: ", isb)
-
         # set uniforms to shaders
-        self.program.setUniformValue("diffuseMap", self.texUnit1)
-        self.program.setUniformValue("normalMap", self.texUnit2)
+        self.program.setUniformValue("diffuseMap", self.diffuseMap["unit"])
+        self.program.setUniformValue(
+            "normalMapR", self.normalMaps["r"]["unit"]
+        )
+        self.program.setUniformValue(
+            "normalMapG", self.normalMaps["g"]["unit"]
+        )
+        self.program.setUniformValue(
+            "normalMapB", self.normalMaps["b"]["unit"]
+        )
 
         self.lampProgram = QOpenGLShaderProgram(self.context)
         self.lampShader_init()
@@ -676,6 +751,23 @@ class PtmGLWidget(QOpenGLWidget):
             rowsize,
             VoidPtr(self.attrLoc["aPos"]["offset"] * floatSize),
         )
+        rowsize = 0
+        for key, valdi in self.attrLoc.items():
+            rowsize += valdi["stride"]
+        #
+        ks = ["layout", "stride", "offset"]
+        for key, valdi in self.attrLoc.items():
+            funcs.glEnableVertexAttribArray(valdi[ks[0]])
+            funcs.glVertexAttribPointer(
+                valdi[ks[0]],
+                valdi[ks[1]],
+                int(pygl.GL_FLOAT),
+                int(pygl.GL_FALSE),
+                rowsize,
+                VoidPtr(valdi[ks[2]] * floatSize),
+            )
+
+
         # textures
         self.diffuseMap_proc()
         self.normalMap_proc()
@@ -690,10 +782,48 @@ class PtmGLWidget(QOpenGLWidget):
         # set uniforms to shader
         self.setObjectUniforms_proc()
         # bind texture
-        self.diffuseMap.bind()
-        self.normalMap.bind()
+        self.diffuseMap_proc()
+        self.normalMap_proc()
+        self.bindTextures_proc()
         # render object
-        self.renderViewer()
+        # self.renderViewer()
+        quadVertices = []
+        quadVertices = self.addQuadTriangle(
+            vertices=quadVertices,
+            textureTriangle=self.firstTexTriangle,
+            surfaceTriangle=self.firstTriangle,
+        )
+        quadVertices = self.addQuadTriangle(
+            vertices=quadVertices,
+            textureTriangle=self.secondTexTriangle,
+            surfaceTriangle=self.secondTriangle,
+        )
+        quadVertices = np.array(quadVertices, dtype=ctypes.c_float)
+        floatSize = ctypes.sizeof(ctypes.c_float)
+        self.vbo.create()
+        self.vao.create()
+        #
+        self.vao.bind()
+        self.vbo.bind()
+        self.vbo.allocate(
+            quadVertices.tobytes(), floatSize * quadVertices.size
+        )
+        # self.enableVaoAttribs()
+        funcs.glEnableVertexAttribArray(self.attrLoc["aPos"]["layout"])
+        funcs.glVertexAttribPointer(
+                self.attrLoc["aPos"]["layout"],
+                self.attrLoc["aPos"]["stride"],
+                int(pygl.GL_FLOAT),
+                int(pygl.GL_FALSE),
+                rowsize,
+                VoidPtr(self.attrLoc["aPos"]["offset"] * floatSize),
+                )
+                self.vao.bind()
+        funcs.glDrawArrays(pygl.GL_TRIANGLES, 0, 6)
+        self.vao.release()
+
+        # end render viewer
+        # self.releaseTextures_proc()
 
         # bind shader: lamp
         self.lampProgram.bind()

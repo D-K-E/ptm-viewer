@@ -18,7 +18,9 @@ class RGBPTM(PTMFileParse):
         self.imheight = self.ptmfile["image_height"]
         self.imwidth = self.ptmfile["image_width"]
         self.coefficients = self.ptmfile["coeffarr"]
-        self.imcoeffs = self.coefficients.reshape((3, self.imheight * self.imwidth, 6))
+        self.imcoeffs = self.coefficients.reshape(
+            (3, self.imheight * self.imwidth, 6)
+        )
         self.normal = None
         self.image = None
         self.setSurfaceNormal()
@@ -52,7 +54,14 @@ class RGBPTM(PTMFileParse):
     def form_light_direction_mat(self, luvec, lvvec):
         "Form the light direction matrice"
         l_mat = np.array(
-            [luvec ** 2, lvvec ** 2, lvvec * luvec, luvec, lvvec, np.ones_like(lvvec)],
+            [
+                luvec ** 2,
+                lvvec ** 2,
+                lvvec * luvec,
+                luvec,
+                lvvec,
+                np.ones_like(lvvec),
+            ],
             dtype=np.float,
         )
         return l_mat.T
@@ -68,20 +77,17 @@ class RGBPTM(PTMFileParse):
         arr = channel_coeffarr.reshape((-1, 6))
         light_dir_mat = self.get_light_direction_matrix(arr)
         intensity = np.sum(arr * light_dir_mat, axis=1, dtype=np.float32)
-        intensity = np.squeeze(intensity.reshape((self.imheight, self.imwidth,
-                                                  -1))
-                               )
+        intensity = np.squeeze(
+            intensity.reshape((self.imheight, self.imwidth, -1))
+        )
         return intensity
 
-    def form_surface_normal(self, luvec,
-                            lvvec):
+    def form_surface_normal(self, luvec, lvvec):
         "Form surface normal matrice"
         normal = np.array(
-            [luvec,
-             lvvec,
-             np.sqrt(1 - luvec**2 - lvvec**2)
-             ],
-            dtype=np.float)
+            [luvec, lvvec, np.sqrt(1 - luvec ** 2 - lvvec ** 2)],
+            dtype=np.float,
+        )
         return np.transpose(normal, (1, 0))
 
     def get_surface_normal(self, coeffarr):
@@ -92,22 +98,41 @@ class RGBPTM(PTMFileParse):
         lvvec = self.get_light_dirV_vec(coeffarr)
         return self.form_surface_normal(luvec, lvvec)
 
-    def setSurfaceNormal(self):
+    def setSurfaceNormal(self) -> None:
         "Set surface normal values to ptm"
-        coeffs = self.imcoeffs.reshape((-1, 6))
-        normals = self.get_surface_normal(coeffs)
+        coeffs = self.imcoeffs.reshape((3, -1, 6))
+        normals = np.empty((3, coeffs.shape[1], 3), dtype=np.float)
+        normalR = self.get_surface_normal(coeffs[0, :, :])
+        normalG = self.get_surface_normal(coeffs[1, :, :])
+        normalB = self.get_surface_normal(coeffs[2, :, :])
+        normals[0, :, :] = normalR
+        normals[1, :, :] = normalG
+        normals[2, :, :] = normalB
         self.normal = normals
-        return normals
+        return
 
-    def getNormalMap(self):
-        "get normal map for surface normals"
-        nr = self.normal
-        nshape = nr.shape
-        pdb.set_trace()
-        nr = np.interp(nr, (nr.min(), nr.max()), (-1, 1))
-        norm1 = np.interp(nr, (nr.min(), nr.max()), (0, 255))
-        normals = norm1.reshape((self.imheight, self.imwidth, 3))
-        return Image.fromarray(normals)
+    def getChannelNormalMap(self, channel: str):
+        "get normal map for surface normals per channel"
+        channel = channel.lower()
+        if channel == "r" or channel == "red":
+            normal = self.normal[0, :, :]
+        elif channel == "g" or channel == "green":
+            normal = self.normal[1, :, :]
+        elif channel == "b" or channel == "blue":
+            normal = self.normal[2, :, :]
+        nshape = normal.shape
+        normal = np.interp(normal, (normal.min(), normal.max()), (-1, 1))
+        normal = np.interp(normal, (normal.min(), normal.max()), (0, 255))
+        normalMap = normal.reshape((self.imheight, self.imwidth, 3))
+        nmap = normalMap.astype("uint8", copy=False)
+        return Image.fromarray(nmap)
+
+    def getNormalMaps(self):
+        "get normal map"
+        nmapR = self.getChannelNormalMap("red")
+        nmapG = self.getChannelNormalMap("green")
+        nmapB = self.getChannelNormalMap("blue")
+        return nmapR, nmapG, nmapB
 
     def setImage(self):
         "set image rgb values"
@@ -123,4 +148,3 @@ class RGBPTM(PTMFileParse):
 
     def getImage(self):
         return Image.fromarray(self.image)
-

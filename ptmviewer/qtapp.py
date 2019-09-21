@@ -16,6 +16,7 @@ from PIL import Image, ImageQt
 from ptmviewer.interface.window import Ui_MainWindow
 from ptmviewer.glwidget import PtmGLWidget
 from ptmviewer.rgbptm import RGBPTM
+from ptmviewer.glrectangle import RectangleGL
 
 
 class AppWindowInit(Ui_MainWindow):
@@ -87,16 +88,25 @@ class AppWindowFinal(AppWindowInit):
         cindex = self.fileList.indexFromItem(citem)
         ptmobj = self.ptmfiles[cindex]
         ptm = RGBPTM(ptmobj["path"])
-        nimg = ptm.getNormalMap()
-        nimgQt = ImageQt.ImageQt(nimg)
+        nimgr, nimgg, nimgb = ptm.getNormalMaps()
+        nimgrQt = ImageQt.ImageQt(nimgr)
+        nimggQt = ImageQt.ImageQt(nimgg)
+        nimgbQt = ImageQt.ImageQt(nimgb)
         texture = ptm.getImage()
         textureQt = ImageQt.ImageQt(texture)
-        self.viewerWidget = PtmGLWidget(surfaceNormals=nimgQt, texture=textureQt)
+        self.viewerWidget = PtmGLWidget(
+            surfaceNormalR=nimgrQt, 
+            surfaceNormalG=nimggQt, 
+            surfaceNormalB=nimgbQt, 
+            texture=textureQt
+        )
+        # self.viewerWidget = RectangleGL()
         info = self.viewerWidget.getGLInfo()
+        # info = self.viewerWidget.getGlInfo()
         self.statusbar.showMessage(info, 5000)
-        self.viewerWidget.makeCurrent()
-        self.viewerWidget.initializeGL()
-        self.viewerWidget.paintGL()
+        # self.viewerWidget.update()
+        print("gl initialized in app")
+        self.viewerWidget.show()
 
     def moveGLCamera(self, direction: str):
         self.viewerWidget.moveCamera(direction)
@@ -145,42 +155,54 @@ class AppWindowFinal(AppWindowInit):
         offsetx = 0.0
         offsety = 0.0
         offsetz = -0.5
-        self.viewerWidget.moveLight(xoffset=offsetx, yoffset=offsety, zoffset=offsetz)
+        self.viewerWidget.moveLight(
+            xoffset=offsetx, yoffset=offsety, zoffset=offsetz
+        )
 
     def moveLightPosBackward(self):
         ""
         offsetx = 0.0
         offsety = 0.0
         offsetz = 0.5
-        self.viewerWidget.moveLight(xoffset=offsetx, yoffset=offsety, zoffset=offsetz)
+        self.viewerWidget.moveLight(
+            xoffset=offsetx, yoffset=offsety, zoffset=offsetz
+        )
 
     def moveLightPosLeft(self):
         ""
         offsetx = -1.0
         offsety = 0.0
         offsetz = 0.0
-        self.viewerWidget.moveLight(xoffset=offsetx, yoffset=offsety, zoffset=offsetz)
+        self.viewerWidget.moveLight(
+            xoffset=offsetx, yoffset=offsety, zoffset=offsetz
+        )
 
     def moveLightPosRight(self):
         ""
         offsetx = 0.5
         offsety = 0.0
         offsetz = 0.0
-        self.viewerWidget.moveLight(xoffset=offsetx, yoffset=offsety, zoffset=offsetz)
+        self.viewerWidget.moveLight(
+            xoffset=offsetx, yoffset=offsety, zoffset=offsetz
+        )
 
     def moveLightPosUp(self):
         ""
         offsetx = 0.0
         offsety = 0.5
         offsetz = 0.0
-        self.viewerWidget.moveLight(xoffset=offsetx, yoffset=offsety, zoffset=offsetz)
+        self.viewerWidget.moveLight(
+            xoffset=offsetx, yoffset=offsety, zoffset=offsetz
+        )
 
     def moveLightPosDown(self):
         ""
         offsetx = 0.0
         offsety = -0.5
         offsetz = 0.0
-        self.viewerWidget.moveLight(xoffset=offsetx, yoffset=offsety, zoffset=offsetz)
+        self.viewerWidget.moveLight(
+            xoffset=offsetx, yoffset=offsety, zoffset=offsetz
+        )
 
     def rotateLights(self):
         rx = self.rotLightX.value()
@@ -206,7 +228,7 @@ class AppWindowFinal(AppWindowInit):
         "Import ptm files from folder using file dialog"
         self.fileList.clear()
         fdir = QtWidgets.QFileDialog.getOpenFileNames(
-            self.centralwidget, "Select PTM files", "", "PTMs (*.ptm)"
+            self.centralwidget, "Select PTM files", "./main/assets/ptms", "PTMs (*.ptm)"
         )
         if fdir:
             for fname in fdir[0]:
