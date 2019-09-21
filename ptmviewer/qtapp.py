@@ -16,7 +16,6 @@ from PIL import Image, ImageQt
 from ptmviewer.interface.window import Ui_MainWindow
 from ptmviewer.glwidget import PtmGLWidget
 from ptmviewer.rgbptm import RGBPTM
-from ptmviewer.glrectangle import RectangleGL
 
 
 class AppWindowInit(Ui_MainWindow):

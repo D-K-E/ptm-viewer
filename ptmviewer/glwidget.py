@@ -732,42 +732,17 @@ class PtmGLWidget(QOpenGLWidget):
         floatSize = ctypes.sizeof(ctypes.c_float)
         # lamp vbo
         self.lampVbo.create()
-        self.lampVao.create()
-        #
         self.lampVbo.bind()
-        self.lampVbo.allocate(
-            self.lampVertices.tobytes(), floatSize * self.lampVertices.size
-        )
-        self.lampVao.bind()
-        funcs.glEnableVertexAttribArray(self.attrLoc["aPos"]["layout"])
-        rowsize = self.attrLoc["aPos"]["stride"] * floatSize
-        print("attribute info: ", self.attrLoc)
-        print("row size info: ", rowsize)
-        funcs.glVertexAttribPointer(
-            self.attrLoc["aPos"]["layout"],
-            self.attrLoc["aPos"]["stride"],
-            int(pygl.GL_FLOAT),
-            int(pygl.GL_FALSE),
-            rowsize,
-            VoidPtr(self.attrLoc["aPos"]["offset"] * floatSize),
-        )
-        rowsize = 0
-        for key, valdi in self.attrLoc.items():
-            rowsize += valdi["stride"]
-        #
-        ks = ["layout", "stride", "offset"]
-        for key, valdi in self.attrLoc.items():
-            funcs.glEnableVertexAttribArray(valdi[ks[0]])
-            funcs.glVertexAttribPointer(
-                valdi[ks[0]],
-                valdi[ks[1]],
-                int(pygl.GL_FLOAT),
-                int(pygl.GL_FALSE),
-                rowsize,
-                VoidPtr(valdi[ks[2]] * floatSize),
-            )
-
-
+        self.lampVbo.allocate(self.lampVertices.tobytes(),
+                self.lampVertices.size * floatSize)
+        self.lampProgram.enableAttributeArray(self.attrLoc['aPos']['layout'])
+        self.lampProgram.setAttributeBuffer(
+                self.attrLoc["aPos"]["layout"],
+                pygl.GL_FLOAT,
+                0,
+                3,
+                3 * floatSize
+                )
         # textures
         self.diffuseMap_proc()
         self.normalMap_proc()
@@ -801,34 +776,61 @@ class PtmGLWidget(QOpenGLWidget):
         quadVertices = np.array(quadVertices, dtype=ctypes.c_float)
         floatSize = ctypes.sizeof(ctypes.c_float)
         self.vbo.create()
-        self.vao.create()
-        #
-        self.vao.bind()
         self.vbo.bind()
-        self.vbo.allocate(
-            quadVertices.tobytes(), floatSize * quadVertices.size
-        )
-        # self.enableVaoAttribs()
-        funcs.glEnableVertexAttribArray(self.attrLoc["aPos"]["layout"])
-        funcs.glVertexAttribPointer(
+        self.vbo.allocate(quadVertices.tobytes(), 
+                quadVertices.size * floatSize)
+        rowsize = 0
+        for key, valdi in self.attrLoc.items():
+            rowsize += valdi["stride"]
+        self.program.enableAttributeArray(self.attrLoc["aPos"]["layout"])
+        self.program.setAttributeBuffer(
                 self.attrLoc["aPos"]["layout"],
+                pygl.GL_FLOAT,
+                self.attrLoc["aPos"]["offset"] * floatSize,
                 self.attrLoc["aPos"]["stride"],
-                int(pygl.GL_FLOAT),
-                int(pygl.GL_FALSE),
-                rowsize,
-                VoidPtr(self.attrLoc["aPos"]["offset"] * floatSize),
                 )
-                self.vao.bind()
+        self.program.enableAttributeArray(self.attrLoc["aNormal"]["layout"])
+        self.program.setAttributeBuffer(
+                self.attrLoc["aNormal"]["layout"],
+                pygl.GL_FLOAT,
+                self.attrLoc["aNormal"]["offset"] * floatSize,
+                self.attrLoc["aNormal"]["stride"],
+                )
+        self.program.enableAttributeArray(self.attrLoc["aTexCoord"]["layout"])
+        self.program.setAttributeBuffer(
+                self.attrLoc["aTexCoord"]["layout"],
+                pygl.GL_FLOAT,
+                self.attrLoc["aTexCoord"]["offset"] * floatSize,
+                self.attrLoc["aTexCoord"]["stride"],
+                )
+        self.program.enableAttributeArray(self.attrLoc["aTangent"]["layout"])
+        self.program.setAttributeBuffer(
+                self.attrLoc["aTangent"]["layout"],
+                pygl.GL_FLOAT,
+                self.attrLoc["aTangent"]["offset"] * floatSize,
+                self.attrLoc["aTangent"]["stride"],
+                )
+        self.program.enableAttributeArray(self.attrLoc["aBiTangent"]["layout"])
+        self.program.setAttributeBuffer(
+                self.attrLoc["aBiTangent"]["layout"],
+                pygl.GL_FLOAT,
+                self.attrLoc["aBiTangent"]["offset"] * floatSize,
+                self.attrLoc["aBiTangent"]["stride"],
+                )
+        
+        self.vao.bind()
         funcs.glDrawArrays(pygl.GL_TRIANGLES, 0, 6)
         self.vao.release()
+        self.vbo.release()
 
         # end render viewer
-        # self.releaseTextures_proc()
+        self.releaseTextures_proc()
 
         # bind shader: lamp
         self.lampProgram.bind()
         # set uniforms to shader
         self.setLampShaderUniforms()
         # render lamp
-        self.lampVao.bind()
         funcs.glDrawArrays(pygl.GL_TRIANGLES, 0, 36)
+        self.lampVao.release()
+        self.lampVbo.release()
