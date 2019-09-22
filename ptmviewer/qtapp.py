@@ -87,17 +87,7 @@ class AppWindowFinal(AppWindowInit):
         cindex = self.fileList.indexFromItem(citem)
         ptmobj = self.ptmfiles[cindex]
         ptm = RGBPTM(ptmobj["path"])
-        nimgr, nimgg, nimgb = ptm.getNormalMaps()
-        nimgrQt = ImageQt.ImageQt(nimgr)
-        nimggQt = ImageQt.ImageQt(nimgg)
-        nimgbQt = ImageQt.ImageQt(nimgb)
-        texture = ptm.getImage()
-        textureQt = ImageQt.ImageQt(texture)
         self.viewerWidget = PtmGLWidget(
-            surfaceNormalR=nimgrQt, 
-            surfaceNormalG=nimggQt, 
-            surfaceNormalB=nimgbQt, 
-            texture=textureQt
         )
         # self.viewerWidget = RectangleGL()
         info = self.viewerWidget.getGLInfo()

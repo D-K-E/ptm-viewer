@@ -60,14 +60,10 @@ from PySide2.QtWidgets import QOpenGLWidget
 class PtmGLWidget(QOpenGLWidget):
     "OpenGL widget"
 
-    def __init__(
-        self,
-        surfaceNormalR: QImage,
-        surfaceNormalG: QImage,
-        surfaceNormalB: QImage,
-        texture: QImage,
-        parent=None,
-    ):
+    def __init__(self, 
+            vertices: np.ndarray,
+            indices: np.ndarray,
+            parent=None):
         QOpenGLWidget.__init__(self, parent)
         # camera
         self.camera = QtCamera()
@@ -85,10 +81,24 @@ class PtmGLWidget(QOpenGLWidget):
         self.shaders = shaders
         self.attrLoc = {
             "aPos": {"stride": 3, "offset": 0, "layout": 0},
-            "aNormal": {"stride": 3, "offset": 3, "layout": 1},
-            "aTexCoord": {"stride": 2, "offset": 5, "layout": 2},
-            "aTangent": {"stride": 3, "offset": 8, "layout": 3},
-            "aBiTangent": {"stride": 3, "offset": 11, "layout": 4},
+            "acoeff1r": {"stride": 1, "offset": 3, "layout": 1},
+            "acoeff2r": {"stride": 1, "offset": 4, "layout": 2},
+            "acoeff3r": {"stride": 1, "offset": 5, "layout": 3},
+            "acoeff4r": {"stride": 1, "offset": 6, "layout": 4},
+            "acoeff5r": {"stride": 1, "offset": 7, "layout": 5},
+            "acoeff6r": {"stride": 1, "offset": 8, "layout": 6},
+            "acoeff1g": {"stride": 1, "offset": 9, "layout": 7},
+            "acoeff2g": {"stride": 1, "offset": 10, "layout": 8},
+            "acoeff3g": {"stride": 1, "offset": 11, "layout": 9},
+            "acoeff4g": {"stride": 1, "offset": 12, "layout": 10},
+            "acoeff5g": {"stride": 1, "offset": 13, "layout": 11},
+            "acoeff6g": {"stride": 1, "offset": 14, "layout": 12},
+            "acoeff1b": {"stride": 1, "offset": 15, "layout": 13},
+            "acoeff2b": {"stride": 1, "offset": 16, "layout": 14},
+            "acoeff3b": {"stride": 1, "offset": 17, "layout": 15},
+            "acoeff4b": {"stride": 1, "offset": 18, "layout": 16},
+            "acoeff5b": {"stride": 1, "offset": 19, "layout": 17},
+            "acoeff6b": {"stride": 1, "offset": 20, "layout": 18},
         }
         self.rowsize = 0
         for aName, aprop in self.attrLoc.items():
@@ -96,83 +106,16 @@ class PtmGLWidget(QOpenGLWidget):
         # opengl data
 
         self.context = QOpenGLContext()
+        self.lampVao = QOpenGLVertexArrayObject()
+        self.vao = QOpenGLVertexArrayObject()
         self.lampVbo = QOpenGLBuffer(QOpenGLBuffer.VertexBuffer)
         self.vbo = QOpenGLBuffer(QOpenGLBuffer.VertexBuffer)
 
         self.program = QOpenGLShaderProgram()
         self.lampProgram = QOpenGLShaderProgram()
-        self.diffuseMap = {
-            "texture": None,
-            "unit": 3,
-            "data": texture.mirrored(),
-        }  # texture
-        self.specularMap = None  # texture
-        self.normalMaps = {
-            "r": {
-                "texture": None,
-                "unit": 0,
-                "data": surfaceNormalR.mirrored(),
-            },
-            "g": {
-                "texture": None,
-                "unit": 1,
-                "data": surfaceNormalG.mirrored(),
-            },
-            "b": {
-                "texture": None,
-                "unit": 2,
-                "data": surfaceNormalB.mirrored(),
-            },
-        }  # texture
-        # texture
-        self.textureImage = texture.mirrored()
-        imrect = self.textureImage.rect()
-        imwidth = imrect.width()
-        imheight = imrect.height()
-        imcenter = imrect.center()
-        imRightX = imcenter.x()
-        imTopY = imcenter.y()
-        imLeftX = imRightX - imwidth
-        imBottomY = imTopY - imheight
-
         # vertices
-        # self.textureViewerTLeft = QVector3D(imLeftX, imTopY, 0.0)
-        # self.textureViewerBLeft = QVector3D(imLeftX, imBottomY, 0.0)
-        # self.textureViewerBRight = QVector3D(imRightX, imBottomY, 0.0)
-        # self.textureViewerTRight = QVector3D(imRightX, imTopY, 0.0)
-        self.textureViewerTLeft = QVector3D(-1.0, 1.0, 0.0)
-        self.textureViewerBLeft = QVector3D(-1.0, -1.0, 0.0)
-        self.textureViewerBRight = QVector3D(1.0, -1.0, 0.0)
-        self.textureViewerTRight = QVector3D(1.0, 1.0, 0.0)
-
-        self.firstTriangle = (
-            self.textureViewerTLeft,
-            self.textureViewerBLeft,
-            self.textureViewerBRight,
-        )
-        self.secondTriangle = (
-            self.textureViewerTLeft,
-            self.textureViewerTRight,
-            self.textureViewerBRight,
-        )
-
-        self.textureCoordCorner1 = QVector2D(0.0, 1.0)
-        self.textureCoordCorner2 = QVector2D(0.0, 0.0)
-        self.textureCoordCorner3 = QVector2D(1.0, 0.0)
-        self.textureCoordCorner4 = QVector2D(1.0, 1.0)
-
-        self.firstTexTriangle = (
-            self.textureCoordCorner1,
-            self.textureCoordCorner2,
-            self.textureCoordCorner3,
-        )
-        self.secondTexTriangle = (
-            self.textureCoordCorner1,
-            self.textureCoordCorner3,
-            self.textureCoordCorner4,
-        )
-
-        self.viewerNormal = QVector3D(0.0, 0.0, 1.0)
+        self.vertices = vertices
+        self.indices = indices
 
         self.lampVertices = np.array(
             [  # first square for cube
@@ -423,199 +366,9 @@ class PtmGLWidget(QOpenGLWidget):
         self.rotationAngle = val
         self.update()
 
-    def diffuseMap_proc(self):
-        self.diffuseMap["texture"] = QOpenGLTexture(QOpenGLTexture.Target2D)
-        self.diffuseMap["texture"].create()
-        self.diffuseMap["texture"].bind(self.diffuseMap["unit"])
-        self.diffuseMap["texture"].setData(self.diffuseMap["data"])
-        self.diffuseMap["texture"].setMinMagFilters(
-            QOpenGLTexture.Nearest, QOpenGLTexture.Nearest
-        )
-        self.diffuseMap["texture"].setWrapMode(
-            QOpenGLTexture.DirectionS, QOpenGLTexture.Repeat
-        )
-        self.diffuseMap["texture"].setWrapMode(
-            QOpenGLTexture.DirectionT, QOpenGLTexture.Repeat
-        )
-
-    def normalMap_proc(self):
-        "Procedure for creating and loading textures"
-        for channel, cdict in self.normalMaps.items():
-            cdict["texture"] = QOpenGLTexture(QOpenGLTexture.Target2D)
-            cdict["texture"].create()
-            cdict["texture"].bind(cdict["unit"])
-            cdict["texture"].setData(cdict["data"])
-            cdict["texture"].setMinMagFilters(
-                QOpenGLTexture.LinearMipMapLinear, QOpenGLTexture.Linear
-            )
-            cdict["texture"].setWrapMode(
-                QOpenGLTexture.DirectionS, QOpenGLTexture.Repeat
-            )
-            cdict["texture"].setWrapMode(
-                QOpenGLTexture.DirectionT, QOpenGLTexture.Repeat
-            )
-
-    def computeTangentBiTangent(
-        self,
-        edge1: QVector3D,
-        edge2: QVector3D,
-        deltaUv1: QVector3D,
-        deltaUv2: QVector3D,
-    ):
-        "Compute tangent and bi tangent vectors"
-        d12xy = deltaUv1.x() * deltaUv2.y()
-        d21xy = deltaUv2.x() * deltaUv1.y()
-        coeff = d12xy - d21xy
-        coeff = 1.0 / coeff
-        #
-        tangent = QVector3D()
-        dY2 = deltaUv2.y()
-        dY1 = deltaUv1.y()
-        dX1 = deltaUv1.x()
-        dX2 = deltaUv2.x()
-        # x
-        ex1 = edge1.x()
-        ex2 = edge2.x()
-        # y
-        ey1 = edge1.y()
-        ey2 = edge2.y()
-        # z
-        ez1 = edge1.z()
-        ez2 = edge2.z()
-        # tangent
-        tangent.setX(coeff * ((dY2 * ex1) - (dY1 * ex2)))
-        tangent.setY(coeff * ((dY2 * ey1) - (dY1 * ey2)))
-        tangent.setZ(coeff * ((dY2 * ez1) - (dY1 * ez2)))
-        tangent.normalize()
-        # bi tangent
-        bitangent = QVector3D()
-        bitangent.setX(coeff * ((-dX2 * ex1) + (dX1 * ex2)))
-        bitangent.setY(coeff * ((-dX2 * ey1) + (dX1 * ey2)))
-        bitangent.setZ(coeff * ((-dX2 * ez1) + (dX1 * ez2)))
-        bitangent.normalize()
-        #
-        return tangent, bitangent
-
-    def append2vertices(self, vertices: list, values: list):
-        "Add values to vertices"
-        for val in values:
-            vertices.append(val)
-        #
-        return vertices
-
-    def makeVerticesRow(self, rowVals: dict):
-        "Make quad row"
-        texCoord = rowVals["aTexCoord"]
-        pos = rowVals["aPos"]
-        normal = rowVals["aNormal"]
-        tangent = rowVals["aTangent"]
-        bitangent = rowVals["aBiTangent"]
-        return (
-            pos.x(),
-            pos.y(),
-            pos.z(),
-            normal.x(),
-            normal.y(),
-            normal.z(),
-            texCoord.x(),
-            texCoord.y(),
-            tangent.x(),
-            tangent.y(),
-            tangent.z(),
-            bitangent.x(),
-            bitangent.y(),
-            bitangent.z(),
-        )
-
-    def addTriangleVertices(
-        self, vertices: list, surfaceTriangle, textureTriangle
-    ):
-        "Compute quad rows from given triangles"
-        edge1 = surfaceTriangle[1] - surfaceTriangle[0]
-        edge2 = surfaceTriangle[2] - surfaceTriangle[0]
-        deltaUv1 = textureTriangle[1] - textureTriangle[0]
-        deltaUv2 = textureTriangle[2] - textureTriangle[0]
-        tangent, bitangent = self.computeTangentBiTangent(
-            edge1, edge2, deltaUv1, deltaUv2
-        )
-        for i in range(3):
-            tt = textureTriangle[i]
-            st = surfaceTriangle[i]
-            rowd = {key: None for key in self.attrLoc.keys()}
-            rowd["aPos"] = st
-            rowd["aTexCoord"] = tt
-            rowd["aTangent"] = tangent
-            rowd["aBiTangent"] = bitangent
-            rowd["aNormal"] = self.viewerNormal
-            row = self.makeVerticesRow(rowd)
-            self.append2vertices(vertices, row)
-        #
-        return vertices
-
-    def renderViewer(self):
-        "Render viewer object with texture object"
-        funcs = self.context.functions()
-        self.vbo.create()
-        self.vbo.bind()
-        # prepare data for allocation
-        vertices = []
-        self.addTriangleVertices(
-            vertices,
-            surfaceTriangle=self.firstTriangle,
-            textureTriangle=self.firstTexTriangle,
-        )
-        self.addTriangleVertices(
-            vertices,
-            surfaceTriangle=self.secondTriangle,
-            textureTriangle=self.secondTexTriangle,
-        )
-        data = np.array(vertices, dtype=ctypes.c_float)
-        floatSize = ctypes.sizeof(ctypes.c_float)
-        self.vbo.allocate(data.tobytes(), data.size * floatSize)
-        # point to attributes stored in vbo from program
-        self.vbo.bind()
-        for aname, aprop in self.attrLoc.items():
-            self.program.enableAttributeArray(aprop["layout"])
-            self.program.setAttributeBuffer(
-                aprop["layout"],
-                pygl.GL_FLOAT,
-                aprop["offset"],
-                aprop["stride"],
-                aprop["stride"] * floatSize
-            )
-        #
-        self.bindTextures_proc()
-        funcs.glDrawArrays(pygl.GL_TRIANGLES, 0, 6)
-        self.vbo.release()
-        self.releaseTextures_proc()
-
-    def setObjectUniforms_proc(self):
-        "Set object uniforms program"
-        # vertex shader
-        # set projection
-        projection = QMatrix4x4()
-        projection.perspective(
-            self.camera.zoom, self.width() / self.height(), 0.2, 100.0
-        )
-        self.program.setUniformValue("projection", projection)
-        view = self.camera.getViewMatrix()
-        self.program.setUniformValue("view", view)
-        model = QMatrix4x4()
-        self.program.setUniformValue("model", model)
-        viewPos = self.camera.position
-        self.program.setUniformValue("viewPos", viewPos)
-        lightPos = self.lamp.position
-        self.program.setUniformValue("lightPos", lightPos)
-        # end vertex shader uniforms
-        # fragment shader
-        self.program.setUniformValue("lightColor", self.lamp.color)
-        self.program.setUniformValue("ambientCoeff", self.ambientCoeff)
-        self.program.setUniformValue("shininess", self.shininess)
-        # end fragment shader
-
     def objectShader_init(self):
         "Object shader initialization"
-        shader = "quadPerChannelTest"
+        shader = "rgbptm"
         vshader = self.loadVertexShader(shader, fromFile=False)
         fshader = self.loadFragmentShader(shader, fromFile=False)
         self.program.addShader(vshader)
@@ -624,6 +377,13 @@ class PtmGLWidget(QOpenGLWidget):
             self.program.bindAttributeLocation(attr, adict["layout"])
         linked = self.program.link()
         print(shader, "shader linked: ", linked)
+
+    def setObjectUniforms_proc(self):
+        "set object shader uniforms"
+        self.program.setUniformValue("lightPos", self.lamp.position)
+        self.program.setUniformValue("coeffRed", self.lamp.color.x())
+        self.program.setUniformValue("coeffGreen", self.lamp.color.y())
+        self.program.setUniformValue("coeffBlue", self.lamp.color.z())
 
     def lampShader_init(self):
         "Lamp shader initialization"
@@ -656,31 +416,6 @@ class PtmGLWidget(QOpenGLWidget):
         self.lampProgram.setUniformValue("model", model)
         self.lampProgram.setUniformValue("lightColor", self.lamp.color)
 
-    def setTextureUnit_proc(self):
-        "Set texture units to shader at initialization"
-        self.program.setUniformValue("diffuseMap", self.diffuseMap["unit"])
-        self.program.setUniformValue(
-            "normalMapR", self.normalMaps["r"]["unit"]
-        )
-        self.program.setUniformValue(
-            "normalMapG", self.normalMaps["g"]["unit"]
-        )
-        self.program.setUniformValue(
-            "normalMapB", self.normalMaps["b"]["unit"]
-        )
-
-    def bindTextures_proc(self):
-        "bind textures to context"
-        self.diffuseMap["texture"].bind()
-        for channel, cdict in self.normalMaps.items():
-            cdict["texture"].bind()
-
-    def releaseTextures_proc(self):
-        "release textures from context"
-        self.diffuseMap["texture"].release(self.diffuseMap["unit"])
-        for channel, cdict in self.normalMaps.items():
-            cdict["texture"].release(cdict["unit"])
-
     def cleanUpGL(self):
         "Clean up everything"
         self.context.makeCurrent()
@@ -707,7 +442,6 @@ class PtmGLWidget(QOpenGLWidget):
         funcs.glClearColor(0.0, 0.0, 0.0, 0)
         funcs.glEnable(pygl.GL_DEPTH_TEST)
         funcs.glEnable(pygl.GL_CULL_FACE)
-        funcs.glEnable(pygl.GL_TEXTURE_2D)
 
         # load shaders: lamp shader, object shader
         # initialize shaders
@@ -717,7 +451,22 @@ class PtmGLWidget(QOpenGLWidget):
         isb = self.program.bind()
         print("object shader bound: ", isb)
         # set uniforms to shaders
-        self.setTextureUnit_proc()
+        floatSize = ctypes.sizeof(ctypes.c_float)
+        self.vbo.create()
+        self.vbo.bind()
+        self.vbo.allocate(
+            self.vertices.tobytes(), self.vertices.size * floatSize
+        )
+        self.vbo.bind()
+        for aname, aprop in self.attrLoc.items():
+            self.program.enableAttributeArray(aprop["layout"])
+            self.program.setAttributeBuffer(
+                aprop["layout"],
+                pygl.GL_FLOAT,
+                self.attrLoc["aPos"]["offset"],  # 0
+                self.attrLoc["aPos"]["stride"],  # tuple Size: vec3
+                self.attrLoc["aPos"]["stride"] * floatSize,
+            )
 
         self.lampProgram = QOpenGLShaderProgram(self.context)
         self.lampShader_init()
@@ -742,9 +491,6 @@ class PtmGLWidget(QOpenGLWidget):
             self.attrLoc["aPos"]["stride"],  # tuple Size: vec3
             self.attrLoc["aPos"]["stride"] * floatSize,
         )
-        # textures
-        self.diffuseMap_proc()
-        self.normalMap_proc()
 
     def paintGL(self):
         "drawing loop"
@@ -756,14 +502,15 @@ class PtmGLWidget(QOpenGLWidget):
         # set uniforms to shader
         self.setObjectUniforms_proc()
         # bind texture
-        # self.bindTextures_proc()
-        # render object
-        # self.renderViewer()
+        self.vbo.bind()
+        self.program.bind()
+        funcs.glDrawElements(pygl.GL_POINTS, self.indices.size,
+                pygl.GL_UNSIGNED_INT, self.indices.tobytes())
 
         # end render viewer
         # self.releaseTextures_proc()
-        # self.vbo.release()
-        # self.program.release()
+        self.vbo.release()
+        self.program.release()
 
         # bind shader: lamp
         self.lampProgram.bind()

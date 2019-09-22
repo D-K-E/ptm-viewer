@@ -6,6 +6,7 @@ from ptmviewer.ptmparser import PTMFileParse
 
 import numpy as np
 from PIL import Image
+from ctypes import c_float, c_uint
 import pdb
 
 
@@ -23,8 +24,6 @@ class RGBPTM(PTMFileParse):
         )
         self.normal = None
         self.image = None
-        self.setSurfaceNormal()
-        self.setImage()
 
     def get_light_dirU_vec(self, coeffarr: np.ndarray):
         """
@@ -147,4 +146,42 @@ class RGBPTM(PTMFileParse):
         return
 
     def getImage(self):
+        if self.image:
+            return Image.fromarray(self.image)
+        self.setImage()
         return Image.fromarray(self.image)
+
+    def getVerticesAndSizeArr(self):
+        """
+        obtain vertices from coefficients suitable for opengl drawing
+
+        The idea is to create the content of the vbo here, than pass it 
+        directly for rendering.
+        The two for loops are heavy but necessary for stocking the
+        coordinates, since they themselves play a role in rendering.
+
+        We split the coefficients array into channels.
+        Then reshape the resulting channel coefficients into the image shape
+        The reason is that rgbptm shader takes in a position, and 18
+        coefficients to come up with a fragment color.
+        Due to our specification of the memory layout, the first three
+        components of the VAO has to be position in 3d coordinates
+        """
+        vertices = np.empty((self.imheight, self.imwidth, 21), dtype=c_float)
+        indices = np.array([i for i in range(self.imheight * self.imwidth)],
+                dtype=c_uint)
+        rcoeff = self.imcoeffs[0, :, :]
+        rcoeff = rcoeff.reshape((self.imheight, self.imwidth, 6))
+        gcoeff = self.imcoeffs[1, :, :]
+        gcoeff = gcoeff.reshape((self.imheight, self.imwidth, 6))
+        bcoeff = self.imcoeffs[2, :, :]
+        bcoeff = bcoeff.reshape((self.imheight, self.imwidth, 6))
+        for i in range(self.imheight):
+            for k in range(self.imwidth):
+                vertices[i, k, 0:2] = [i, k]  # x, y coordinates
+                vertices[i, k, 2] = 1.0  # z coordinate
+                vertices[i, k, 3:10] = rcoeff[i, k, :]
+                vertices[i, k, 10:16] = gcoeff[i, k, :]
+                vertices[i, k, 16:] = bcoeff[i, k, :]
+        #
+        return vertices, indices

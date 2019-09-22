@@ -324,19 +324,19 @@ layout (location = 4) in float acoeff4r;
 layout (location = 5) in float acoeff5r;
 layout (location = 6) in float acoeff6r;
 
-layout (location = 1) in float acoeff1g;
-layout (location = 2) in float acoeff2g;
-layout (location = 3) in float acoeff3g;
-layout (location = 4) in float acoeff4g;
-layout (location = 5) in float acoeff5g;
-layout (location = 6) in float acoeff6g;
+layout (location = 7) in float acoeff1g;
+layout (location = 8) in float acoeff2g;
+layout (location = 9) in float acoeff3g;
+layout (location = 10) in float acoeff4g;
+layout (location = 11) in float acoeff5g;
+layout (location = 12) in float acoeff6g;
 
-layout (location = 1) in float acoeff1b;
-layout (location = 2) in float acoeff2b;
-layout (location = 3) in float acoeff3b;
-layout (location = 4) in float acoeff4b;
-layout (location = 5) in float acoeff5b;
-layout (location = 6) in float acoeff6b;
+layout (location = 13) in float acoeff1b;
+layout (location = 14) in float acoeff2b;
+layout (location = 15) in float acoeff3b;
+layout (location = 16) in float acoeff4b;
+layout (location = 17) in float acoeff5b;
+layout (location = 18) in float acoeff6b;
 
 // six coeff per channel
 out float coeff1r;
