@@ -34,7 +34,7 @@
       <item>
        <widget class="QToolBox" name="toolBox">
         <property name="currentIndex">
-         <number>0</number>
+         <number>1</number>
         </property>
         <widget class="QWidget" name="ViewerPage">
          <property name="geometry">
@@ -307,6 +307,9 @@
                     <property name="text">
                      <string>^</string>
                     </property>
+                    <property name="autoRepeat">
+                     <bool>true</bool>
+                    </property>
                    </widget>
                   </item>
                   <item>
@@ -316,6 +319,9 @@
                       <property name="text">
                        <string>&lt;</string>
                       </property>
+                      <property name="autoRepeat">
+                       <bool>true</bool>
+                      </property>
                      </widget>
                     </item>
                     <item>
@@ -323,12 +329,18 @@
                       <property name="text">
                        <string>v</string>
                       </property>
+                      <property name="autoRepeat">
+                       <bool>true</bool>
+                      </property>
                      </widget>
                     </item>
                     <item>
                      <widget class="QPushButton" name="camMoveRight">
                       <property name="text">
                        <string>&gt;</string>
+                      </property>
+                      <property name="autoRepeat">
+                       <bool>true</bool>
                       </property>
                      </widget>
                     </item>
@@ -425,6 +437,9 @@
                       <property name="text">
                        <string>^</string>
                       </property>
+                      <property name="autoRepeat">
+                       <bool>true</bool>
+                      </property>
                      </widget>
                     </item>
                     <item>
@@ -434,6 +449,9 @@
                         <property name="text">
                          <string>&lt;</string>
                         </property>
+                        <property name="autoRepeat">
+                         <bool>true</bool>
+                        </property>
                        </widget>
                       </item>
                       <item>
@@ -441,12 +459,18 @@
                         <property name="text">
                          <string>v</string>
                         </property>
+                        <property name="autoRepeat">
+                         <bool>true</bool>
+                        </property>
                        </widget>
                       </item>
                       <item>
                        <widget class="QPushButton" name="lightMoveRight">
                         <property name="text">
                          <string>&gt;</string>
+                        </property>
+                        <property name="autoRepeat">
+                         <bool>true</bool>
                         </property>
                        </widget>
                       </item>
@@ -469,8 +493,8 @@
           <rect>
            <x>0</x>
            <y>0</y>
-           <width>241</width>
-           <height>179</height>
+           <width>278</width>
+           <height>624</height>
           </rect>
          </property>
          <attribute name="label">
