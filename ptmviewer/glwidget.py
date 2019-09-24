@@ -535,6 +535,25 @@ class PtmLambertianGLWidget(AbstractPtmGLWidget):
         self.lampVbo.destroy()
         self.doneCurrent()
 
+    def programShader_init(self):
+        "Initialize program shader"
+        shname = "lambert"
+        vshader = self.loadVertexShader(shname, fromFile=False)
+        fshader = self.loadFragmentShader(shname, fromFile=False)
+        shaderD = self.shaders[shname]
+        self.setAttrLocFromShader(shname, shaderD)
+        self.setStride(shname)
+        self.program.addShader(vshader)
+        self.program.addShader(fshader)
+        for aname, adict in self.attrLoc[shname].items():
+            if aname != "stride":
+                layout = adict["layout"]
+                self.program.bindAttributeLocation(aname, layout)
+        linked = self.program.link()
+        if not linked:
+            print("program linked:", linked)
+            print("failer log:", self.program.log())
+
     def setShaderUniforms(self):
         "set shader uniforms"
         projectionMatrix = QMatrix4x4()
@@ -606,23 +625,7 @@ class PtmLambertianGLWidget(AbstractPtmGLWidget):
 
         # create object shader
         self.program = QOpenGLShaderProgram(self.context)
-        shname = "lambert"
-        vshader = self.loadVertexShader(shname, fromFile=False)
-        fshader = self.loadFragmentShader(shname, fromFile=False)
-        shaderD = self.shaders[shname]
-        self.setAttrLocFromShader(shname, shaderD)
-        self.setStride(shname)
-        self.program.addShader(vshader)
-        self.program.addShader(fshader)
-        for aname, adict in self.attrLoc[shname].items():
-            if aname != "stride":
-                layout = adict["layout"]
-                self.program.bindAttributeLocation(aname, layout)
-        linked = self.program.link()
-        if not linked:
-            print("program linked:", linked)
-            print("failer log:", self.program.log())
-        #
+        self.programShader_init()
         self.program.bind()
         self.program.setUniformValue("diffuseMap", self.texUnit)
 
