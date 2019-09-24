@@ -626,27 +626,26 @@ class PtmLambertianGLWidget(AbstractPtmGLWidget):
         self.lampVbo.allocate(
             self.lampVertices.tobytes(), self.lampVertices.size * floatSize
         )
-        print("lamp vbo size:", self.lampVbo.size())
 
         # lamp: vao
         self.lampVao.create()
         self.lampVao.bind()
-        # position
-        attrName = "aPos"
         shname = "lamp"
         stride = self.attrLoc[shname]["stride"] * floatSize
-        layout = self.attrLoc[shname][attrName]["layout"]
-        size = self.attrLoc[shname][attrName]["size"]
-        offset = self.attrLoc[shname][attrName]["offset"] * floatSize
-        funcs.glEnableVertexAttribArray(layout)
-        funcs.glVertexAttribPointer(
-            layout,
-            size,
-            int(pygl.GL_FLOAT),
-            int(pygl.GL_FALSE),
-            stride,
-            VoidPtr(offset),
-        )
+        # position
+        for attrName, adict in self.attrLoc[shname].items():
+            if attrName != "stride":
+                layout = adict["layout"]
+                size = adict["size"]
+                offset = adict["offset"] * floatSize
+                funcs.glEnableVertexAttribArray(layout)
+                funcs.glVertexAttribPointer(
+                    layout,
+                    size,
+                    int(pygl.GL_FLOAT),
+                    int(pygl.GL_FALSE),
+                    stride,
+                    VoidPtr(offset))
         # end lamp: vao, vbo
 
         # object: vbo, vao
@@ -655,7 +654,6 @@ class PtmLambertianGLWidget(AbstractPtmGLWidget):
         self.vbo.allocate(
             self.vertices.tobytes(), self.vertices.size * floatSize
         )
-        print("vbo size:", self.vbo.size())
         #
         self.vao.create()
         self.vao.bind()
