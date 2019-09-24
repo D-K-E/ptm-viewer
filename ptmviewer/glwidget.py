@@ -660,50 +660,19 @@ class PtmLambertianGLWidget(AbstractPtmGLWidget):
         #
         shname = "lambert"
         stride = self.attrLoc[shname]["stride"] * floatSize
-        # position
-        attrName = "aPos"
-        layout = self.attrLoc[shname][attrName]["layout"]
-        size = self.attrLoc[shname][attrName]["size"]
-        offset = self.attrLoc[shname][attrName]["offset"] * floatSize
-        funcs.glEnableVertexAttribArray(layout)
-        funcs.glVertexAttribPointer(
-            layout,
-            size,
-            int(pygl.GL_FLOAT),
-            int(pygl.GL_FALSE),
-            stride,
-            VoidPtr(offset),
-        )
-        #
-        # normal
-        attrName = "aNormal"
-        layout = self.attrLoc[shname][attrName]["layout"]
-        size = self.attrLoc[shname][attrName]["size"]
-        offset = self.attrLoc[shname][attrName]["offset"] * floatSize
-        funcs.glEnableVertexAttribArray(layout)
-        funcs.glVertexAttribPointer(
-            layout,
-            size,
-            int(pygl.GL_FLOAT),
-            int(pygl.GL_FALSE),
-            stride,
-            VoidPtr(offset),
-        )
-        #
-        # texture coord
-        attrName = "aTexCoord"
-        layout = self.attrLoc[shname][attrName]["layout"]
-        size = self.attrLoc[shname][attrName]["size"]
-        offset = self.attrLoc[shname][attrName]["offset"] * floatSize
-        funcs.glEnableVertexAttribArray(layout)
-        funcs.glVertexAttribPointer(
-            layout,
-            size,
-            int(pygl.GL_FLOAT),
-            int(pygl.GL_FALSE),
-            stride,
-            VoidPtr(offset),
-        )
+        for attrName, adict in self.attrLoc[shname].items():
+            if attrName != "stride":
+                layout = adict["layout"]
+                size = adict["size"]
+                offset = adict["offset"] * floatSize
+                funcs.glEnableVertexAttribArray(layout)
+                funcs.glVertexAttribPointer(
+                    layout,
+                    size,
+                    int(pygl.GL_FLOAT),
+                    int(pygl.GL_FALSE),
+                    stride,
+                    VoidPtr(offset))
         #
         # create texture
         self.texture = self.createTexture(img=self.img, unit=self.texUnit)
