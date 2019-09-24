@@ -550,10 +550,14 @@ class PtmLambertianGLWidget(AbstractPointLightPtmGLWidget):
         parent=None,
     ):
         super().__init__(parent)
-        self.textures = [{"unit": 0, 
-            "name": "diffuseMap", 
-            "data": ptmImage.mirrored(),
-            "texture": None}]
+        self.textures = [
+            {
+                "unit": 0,
+                "name": "diffuseMap",
+                "data": ptmImage.mirrored(),
+                "texture": None,
+            }
+        ]
         self.lampShaderName = lampShaderName
         self.objectShaderName = objectShaderName
 
@@ -610,76 +614,192 @@ class PtmLambertianGLWidget(AbstractPointLightPtmGLWidget):
         self.lampProgram.setUniformValue("lightColor", self.lamp.color)
 
 
-class PtmNormalMapGLWidget(AbstractPointLightPtmGLWidget):
+class PtmNormalMapGLWidget(PtmLambertianGLWidget):
     "Opengl widget that displays ptm diffuse map and a normal map"
 
-    def __init__(self, ptmImage: QImage, normalMap: QImage, parent=None):
-        super().__init__(parent)
-        self.img = ptmImage.mirrored()
-        self.normal = normalMap.mirrored()
-        self.texUnit1 = 0
-        self.texUnit2 = 1
-        self.texture1 = None
-        self.texture2 = None
-
+    def __init__(self, ptmImage: QImage, 
+            normalMap: QImage, 
+            objectShaderName="quad",
+            lampShaderName="lamp",
+            parent=None):
+        super().__init__(ptmImage, parent)
+        self.objectShaderName = objectShaderName
+        self.lampShaderName = lampShaderName
+        self.textures = [
+            {
+                "texture": None,
+                "name": "diffuseMap",
+                "unit": 0,
+                "data": ptmImage.mirrored(),
+            },
+            {
+                "texture": None,
+                "name": "normalMap",
+                "unit": 1,
+                "data": normalMap.mirrored(),
+            },
+        ]
+        self.coords = {
+                "pos": [
+                    QVector3D(-1.0,  1.0, 0.0),
+                    QVector3D(-1.0,  -1.0, 0.0),
+                    QVector3D(1.0,  -1.0, 0.0),
+                    QVector3D(1.0,  1.0, 0.0),
+                    ],
+                "uv": [
+                    QVector2D(0.0, 1.0),
+                    QVector2D(0.0, 0.0),
+                    QVector2D(1.0, 0.0),
+                    QVector2D(1.0, 1.0),
+                    ],
+                "n": QVector3D(0.0, 0.0, 1.0) 
+        }
+        self.vertices = None
+        self.fromCoords2Vertices()
         # fmt: off
-        self.vertices = np.array([], dtype=ctypes.c_float)
+        # vertices = [
+                # first triangle
+                # self.coords["pos"][0].x(), self.coords["pos"][0].y(),
+                # self.coords["pos"][0].z(), self.coords["n"].x(),
+                # self.coords["n"].y(), self.coords["n"].z(), t1x, t1y, t1z,
+                # bit1x, bit1y, bit1z,
+                # self.coords["pos"][1].x(), self.coords["pos"][1].y(),
+                # self.coords["pos"][1].z(), self.coords["n"].x(),
+                # self.coords["n"].y(), self.coords["n"].z(), t1x, t1y, t1z,
+                # bit1x, bit1y, bit1z,
+                # self.coords["pos"][2].x(), self.coords["pos"][2].y(),
+                # self.coords["pos"][2].z(), self.coords["n"].x(),
+                # self.coords["n"].y(), self.coords["n"].z(), t1x, t1y, t1z,
+                # bit1x, bit1y, bit1z,
 
+                # second triangle
+                # self.coords["pos"][0].x(), self.coords["pos"][0].y(),
+                # self.coords["pos"][0].z(), self.coords["n"].x(),
+                # self.coords["n"].y(), self.coords["n"].z(), t2x, t2y, t2z,
+                # bit2x, bit2y, bit2z,
+                # self.coords["pos"][2].x(), self.coords["pos"][2].y(),
+                # self.coords["pos"][2].z(), self.coords["n"].x(),
+                # self.coords["n"].y(), self.coords["n"].z(), t2x, t2y, t2z,
+                # bit2x, bit2y, bit2z,
+                # self.coords["pos"][3].x(), self.coords["pos"][3].y(),
+                # self.coords["pos"][3].z(), self.coords["n"].x(),
+                # self.coords["n"].y(), self.coords["n"].z(), t2x, t2y, t2z,
+                # bit2x, bit2y, bit2z
+        # ]
         # fmt: on
 
-    def lampShader_init(self):
-        "lamp shader initialization"
-        shname = "lamp"
-        vshader = self.loadVertexShader(shname, fromFile=False)
-        fshader = self.loadFragmentShader(shname, fromFile=False)
-        shaderD = self.shaders[shname]
-        self.setAttrLocFromShader(shname, shaderD)
-        self.setStride(shname)
-        self.lampProgram.addShader(vshader)
-        self.lampProgram.addShader(fshader)
-        for aname, adict in self.attrLoc[shname].items():
-            if aname != "stride":
-                layout = adict["layout"]
-                self.lampProgram.bindAttributeLocation(aname, layout)
-        linked = self.lampProgram.link()
-        if not linked:
-            print("program linked:", linked)
-            print("failer log:", self.lampProgram.log())
+    def computeTangentBiTangent(
+        self,
+        edge1: QVector3D,
+        edge2: QVector3D,
+        deltaUv1: QVector3D,
+        deltaUv2: QVector3D,
+    ):
+        "compute tangent and bitangent vectors given params"
+        t1 = deltaUv1.x() * deltaUv2.y()
+        t2 = deltaUv1.y() * deltaUv2.x()
+        t3 = 1.0 / (t1 - t2)
+        #
+        d2ye1x = deltaUv2.y() * edge1.x()
+        d2ye1y = deltaUv2.y() * edge1.y()
+        d2ye1z = deltaUv2.y() * edge1.z()
+        #
+        d1ye2x = deltaUv1.y() * edge2.x()
+        d1ye2y = deltaUv1.y() * edge2.y()
+        d1ye2z = deltaUv1.y() * edge2.z()
+        #
+        tangent = QVector3D()
+        tangent.setX(t3 * (d2ye1x - d1ye2x))
+        tangent.setY(t3 * (d2ye1y - d1ye2y))
+        tangent.setZ(t3 * (d2ye1z - d1ye2z))
+        tangent.normalize()
+        #
+        bitangent = QVector3D()
+        bitangent.setX(t3 * (-d2ye1x + d1ye2x))
+        bitangent.setY(t3 * (-d2ye1y + d1ye2y))
+        bitangent.setZ(t3 * (-d2ye1z + d1ye2z))
+        bitangent.normalize()
+        #
+        return tangent, bitangent
 
-    def cleanUpGL(self):
-        self.context.makeCurrent()
-        del self.program
-        del self.lampProgram
-        self.program = None
-        self.lampProgram = None
-        self.texture1.destroy()
-        self.texture2.destroy()
-        self.vbo.destroy()
-        self.lampVbo.destroy()
-        self.doneCurrent()
+    def makeCoordList(self, tangent1, 
+            bitangent1, tangent2, bitangent2):
+        "add coords to vertlist"
+        t1x = tangent1.x()
+        t1y = tangent1.y()
+        t1z = tangent1.z()
+        t2x = tangent2.x()
+        t2y = tangent2.y()
+        t2z = tangent2.z()
+        bit1x = bitangent1.x()
+        bit1y = bitangent1.y()
+        bit1z = bitangent1.z()
+        bit2x = bitangent2.x()
+        bit2y = bitangent2.y()
+        bit2z = bitangent2.z()
+        coordList = [
+                # first triangle
+                self.coords["pos"][0].x(), self.coords["pos"][0].y(),
+                self.coords["pos"][0].z(), self.coords["n"].x(),
+                self.coords["n"].y(), self.coords["n"].z(), t1x, t1y, t1z,
+                bit1x, bit1y, bit1z,
+                self.coords["pos"][1].x(), self.coords["pos"][1].y(),
+                self.coords["pos"][1].z(), self.coords["n"].x(),
+                self.coords["n"].y(), self.coords["n"].z(), t1x, t1y, t1z,
+                bit1x, bit1y, bit1z,
+                self.coords["pos"][2].x(), self.coords["pos"][2].y(),
+                self.coords["pos"][2].z(), self.coords["n"].x(),
+                self.coords["n"].y(), self.coords["n"].z(), t1x, t1y, t1z,
+                bit1x, bit1y, bit1z,
 
-    def initializeGL(self):
-        "initialize gl widget"
-        self.context.create()
-        self.context.aboutToBeDestroyed.connect(self.cleanUpGL)
+                # second triangle
+                self.coords["pos"][0].x(), self.coords["pos"][0].y(),
+                self.coords["pos"][0].z(), self.coords["n"].x(),
+                self.coords["n"].y(), self.coords["n"].z(), t2x, t2y, t2z,
+                bit2x, bit2y, bit2z,
+                self.coords["pos"][2].x(), self.coords["pos"][2].y(),
+                self.coords["pos"][2].z(), self.coords["n"].x(),
+                self.coords["n"].y(), self.coords["n"].z(), t2x, t2y, t2z,
+                bit2x, bit2y, bit2z,
+                self.coords["pos"][3].x(), self.coords["pos"][3].y(),
+                self.coords["pos"][3].z(), self.coords["n"].x(),
+                self.coords["n"].y(), self.coords["n"].z(), t2x, t2y, t2z,
+                bit2x, bit2y, bit2z
+        ]
+        return coordList
 
-        # initialize functions
-        funcs = self.context.functions()
-        funcs.initializeOpenGLFunctions()
-        funcs.glClearColor(0.0, 0.4, 0.4, 0)
-        funcs.glEnable(pygl.GL_DEPTH_TEST)
-        funcs.glEnable(pygl.GL_TEXTURE_2D)
+    def fromCoords2Vertices(self):
+        "transform coordinates to vertices"
+        edge1 = self.coords["pos"][1] - self.coords["pos"][0]
+        edge2 = self.coords["pos"][2] - self.coords["pos"][0]
+        delta1 = self.coords["uv"][1] - self.coords["uv"][0]
+        delta2 = self.coords["uv"][2] - self.coords["uv"][0]
+        tangent1, bitangent1 = self.computeTangentBiTangent(edge1, edge2,
+                delta1, delta2)
+        edge1 = self.coords["pos"][2] - self.coords["pos"][0]
+        edge2 = self.coords["pos"][3] - self.coords["pos"][0]
+        delta1 = self.coords["uv"][2] - self.coords["uv"][0]
+        delta2 = self.coords["uv"][3] - self.coords["uv"][0]
+        tangent2, bitangent2 = self.computeTangentBiTangent(edge1, edge2,
+                delta1, delta2)
+        clist = self.makeCoordList(tangent1, bitangent1, tangent2, bitangent2)
+        self.vertices = np.array(clist, dtype=ctypes.c_float)
 
-        floatSize = ctypes.sizeof(ctypes.c_float)
+    def setObjectShaderUniforms_proc(self):
+        "set object shader uniforms"
+        projectionMatrix = QMatrix4x4()
+        projectionMatrix.perspective(
+            self.camera.zoom, self.width() / self.height(), 0.2, 100.0
+        )
+        viewMatrix = self.camera.getViewMatrix()
+        model = QMatrix4x4()
+        color = self.lamp.color
+        pos = self.lamp.position
+        self.program.setUniformValue("projection", projectionMatrix)
+        self.program.setUniformValue("view", viewMatrix)
+        self.program.setUniformValue("model", model)
+        self.program.setUniformValue("lightPos", self.lamp.position)
+        self.program.setUniformValue("viewPos", self.camera.position)
+        self.program.setUniformValue("ambientCoeff", self.ambientCoeff)
+        self.program.setUniformValue("shininess", self.shininess)
 
-        # create lamp shader
-        self.lampProgram = QOpenGLShaderProgram(self.context)
-        self.lampShader_init()
-        self.lampProgram.bind()
-
-        # create object shader
-        self.program = QOpenGLShaderProgram(self.context)
-
-        self.program.bind()
-        self.program.setUniformValue("diffuseMap", self.texUnit1)
-        self.program.setUniformValue("normalMap", self.texUnit2)

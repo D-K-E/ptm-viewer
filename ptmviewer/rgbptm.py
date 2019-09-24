@@ -128,6 +128,8 @@ class RGBPTM(PTMFileParse):
 
     def getNormalMaps(self):
         "get normal map"
+        if not self.normal:
+            self.setSurfaceNormal()
         nmapR = self.getChannelNormalMap("red")
         nmapG = self.getChannelNormalMap("green")
         nmapB = self.getChannelNormalMap("blue")
