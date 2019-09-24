@@ -552,6 +552,25 @@ class PtmLambertianGLWidget(AbstractPtmGLWidget):
         self.program.setUniformValue("lightPos", pos)
         # self.program.setUniformValue("diffuseMap", self.texUnit)
 
+    def lampShader_init(self):
+        "lamp shader initialization"
+        shname = "lamp"
+        vshader = self.loadVertexShader(shname, fromFile=False)
+        fshader = self.loadFragmentShader(shname, fromFile=False)
+        shaderD = self.shaders[shname]
+        self.setAttrLocFromShader(shname, shaderD)
+        self.setStride(shname)
+        self.lampProgram.addShader(vshader)
+        self.lampProgram.addShader(fshader)
+        for aname, adict in self.attrLoc[shname].items():
+            if aname != "stride":
+                layout = adict["layout"]
+                self.lampProgram.bindAttributeLocation(aname, layout)
+        linked = self.lampProgram.link()
+        if not linked:
+            print("program linked:", linked)
+            print("failer log:", self.lampProgram.log())
+
     def setLampShaderUniforms_proc(self):
         "set lamp shader uniforms in paintgl"
         projectionMatrix = QMatrix4x4()
@@ -582,20 +601,7 @@ class PtmLambertianGLWidget(AbstractPtmGLWidget):
         floatSize = ctypes.sizeof(ctypes.c_float)
         # create lamp shader
         self.lampProgram = QOpenGLShaderProgram(self.context)
-        shname = "lamp"
-        vshader = self.loadVertexShader(shname, fromFile=False)
-        fshader = self.loadFragmentShader(shname, fromFile=False)
-        shaderD = self.shaders[shname]
-        self.setAttrLocFromShader(shname, shaderD)
-        self.setStride(shname)
-        self.lampProgram.addShader(vshader)
-        self.lampProgram.addShader(fshader)
-        self.lampProgram.bindAttributeLocation("aPos", 0)
-        linked = self.lampProgram.link()
-        if not linked:
-            print("program linked:", linked)
-            print("failer log:", self.lampProgram.log())
-
+        self.lampShader_init()
         self.lampProgram.bind()
 
         # create object shader
