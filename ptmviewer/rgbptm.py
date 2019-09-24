@@ -180,8 +180,8 @@ class RGBPTM(PTMFileParse):
             for k in range(self.imwidth):
                 vertices[i, k, 0:2] = [i, k]  # x, y coordinates
                 vertices[i, k, 2] = 1.0  # z coordinate
-                vertices[i, k, 3:10] = rcoeff[i, k, :]
-                vertices[i, k, 10:16] = gcoeff[i, k, :]
-                vertices[i, k, 16:] = bcoeff[i, k, :]
+                vertices[i, k, 3:9] = rcoeff[i, k, :]
+                vertices[i, k, 9:15] = gcoeff[i, k, :]
+                vertices[i, k, 15:] = bcoeff[i, k, :]
         #
         return vertices, indices

@@ -4,9 +4,10 @@
 
 lambertVshader = """
 #version 330 core
-layout (location = 0) in vec3 aPos;
-layout (location = 1) in vec3 aNormal;
-layout (location = 2) in vec2 aTexCoord;
+
+in vec3 aPos;
+in vec3 aNormal;
+in vec2 aTexCoord;
 
 out vec3 FragPos;
 out vec3 Normal;
@@ -19,7 +20,7 @@ uniform mat4 projection;
 void main() {
     gl_Position = projection * view * model * vec4(aPos, 1.0);
     FragPos = vec3(model * vec4(aPos, 1.0));
-    Normal = aNormal;
+    Normal = mat3(transpose(inverse(model))) * aNormal;
     TexCoord = aTexCoord;
 }
 """
@@ -33,10 +34,7 @@ in vec2 TexCoord;
 
 out vec4 FragColor;
 
-
 uniform sampler2D diffuseMap;
-
-
 uniform vec3 lightColor;
 uniform vec3 lightPos;
 
@@ -51,7 +49,101 @@ void main() {
 }
 """
 
-objectVshader = """
+phongVshader = """
+#version 330 core
+
+layout (location = 0) in vec3 aPos;
+layout (location = 1) in vec3 aNormal;
+
+uniform mat4 view;
+uniform mat4 model;
+uniform mat4 projection;
+
+out vec3 FragPos;
+out vec3 Normal;
+
+void main() 
+{
+    gl_Position = projection * view * model * vec4(aPos, 1.0);
+    FragPos = vec3(model * vec4(aPos, 1.0));
+    Normal = aNormal;
+}
+"""
+
+phongFshader = """
+#version 330 core
+
+in vec3 FragPos;
+in vec3 Normal;
+
+out vec4 FragColor;
+
+uniform bool blinn;
+
+uniform vec3 lightPos;
+uniform float lightIntensity;
+uniform vec3 lightColor;
+
+uniform vec3 viewerPosition;
+
+uniform vec3 ambientColor;
+uniform float ambientCoeff;
+
+uniform float specularCoeff;
+uniform vec3 specularColor;
+
+uniform float diffuseCoeff;
+uniform vec3 diffuseColor;
+
+uniform float shininess;
+
+uniform float attC1;
+uniform float attC2;
+uniform float attC3;
+
+void main() {
+    // ambient term I_a × k_a × O_d
+    vec3 ambientTerm = ambientColor * ambientCoeff * diffuseColor;
+
+    // lambertian terms k_d * (N \cdot L) * I_p
+    vec3 surfaceNormal = normalize(Normal);
+    vec3 lightDirection = normalize(lightPos - FragPos);
+    float costheta = dot(lightDirection, surfaceNormal);
+    vec3 lambertianTerm = costheta * diffuseCoeff * lightIntensity * lightColor;
+
+    // attenuation term f_att
+    // f_att = min(\frac{1}{c_1 + c_2{\times}d_L + c_3{\times}d^2_{L}} , 1)
+    float dist = distance(lightPos, FragPos);
+    float distSqr = dist * dist;
+    float att1 = dist * attC2;
+    float att2 = distSqr * attC3;
+    float result = attC1 + att2 + att1;
+    result = 1 / result;
+    float attenuation = min(result, 1);
+
+    // expanding lambertian to phong
+    vec3 phongTerms = lambertianTerm * attenuation;
+    vec3 phong1 = phongTerms * diffuseColor;
+
+    // phong adding specular terms
+    vec3 phong2 = specularColor * specularCoeff;
+
+    vec3 viewerDirection = normalize(viewerPosition - FragPos);
+    float specAngle = 0.0;
+    if(blinn) {
+        vec3 halfwayDirection = normalize(lightDirection + viewerDirection);
+        specAngle = max(dot(surfaceNormal, halfwayDirection), 0);
+    }else{
+        vec3 reflectionDirection = reflect(-lightDirection, surfaceNormal);
+        specAngle = max(dot(viewerDirection, reflectionDirection), 0);
+    }
+    float specular = pow(specAngle, shininess);
+    phong2 = phong2 * specular;
+    FragColor = vec4(phong1 + phong2 + ambientTerm, 1.0);
+}
+"""
+
+quadVshader = """
 #version 330 core
 
 // specify input
@@ -99,7 +191,7 @@ void main()
 }
 """
 
-objectFshader = """
+quadFshader = """
 #version 330 core
 in vec3 FragPos;
 in vec2 TexCoords;
@@ -153,7 +245,7 @@ void main()
 }
 """
 
-objectFshaderPerChannel = """
+quadFshaderPerChannel = """
 #version 330 core
 in vec3 FragPos;
 in vec2 TexCoords;
@@ -228,7 +320,7 @@ void main()
     FragColor = vec4(ambientColor + diffuseColor + specularColor, 1.0);
 }
 """
-objectFshaderPerChannelTest = """
+quadFshaderPerChannelTest = """
 #version 330 core
 in vec3 FragPos;
 in vec2 TexCoords;
@@ -425,54 +517,335 @@ in float coeff5b;
 in float coeff6b;
 
 uniform vec3 lightPos;
+uniform vec3 viewPos;
 
-uniform float coeffRed;
-uniform float coeffGreen;
-uniform float coeffBlue;
+uniform vec3 lightColor;
+uniform float shininess;
+
+uniform vec3 attc;
+
+uniform vec3 diffuseCoeffs;
+uniform vec3 specularCoeffs;
+uniform vec3 ambientCoeffs;
+
+uniform bool blinn;
+
+float computeLuPerChannel(float c0, float c1, float c2, float c3, float c4);
+float computeLvPerChannel(float c0, float c1, float c2, float c3, float c4);
+vec3 computeNormalPerChannel(float c0, float c1, float c2, float c3, float c4);
+float computeDiffuseColorPerChannel(float c0, float c1, float c2, float c3,
+                                    float c4, float c5, float Lu, float Lv);
+vec3 computeDiffuseColor(float c0r, float c1r,
+                         float c2r, float c3r,
+                         float c4r, float c5r,
+                         float LuR, float LvR,
+                         float c0g, float c1g,
+                         float c2g, float c3g,
+                         float c4g, float c5g,
+                         float LuG, float LvG,
+                         float c0b, float c1b,
+                         float c2b, float c3b,
+                         float c4b, float c5b,
+                         float LuB, float LvB,
+                         );
+
+float computeAttenuation(float attC1, float attC2, float attC3, float dist);
+
+float computeFragColorPerChannel(vec3 surfaceNormal, float attc1, 
+                                float attc2, float attc3,
+                                float objDiffuseChannelIntensity,
+                                float objDiffuseChannelCoeff,
+                                float ambientChannelCoeff,
+                                float ambientChannelIntensity,
+                                float specularChannelIntensity,
+                                float specularChannelCoeff,
+                                float lightChannelIntensity,
+                                float shininess, vec3 viewerPosition,
+                                vec3 fragPos, vec3 lightPosition,
+                                bool blinn);
 
 void main()
 {
-    vec3 lightDirection = normalize(lightPos - FragPos);
-    float lu = lightDirection.x;
-    float lv = lightDirection.y;
+    vec3 surfaceNormalR = computeNormalPerChannel(
+        coeff1r, coeff2r, coeff3r, coeff4r, coeff5r
+    );
+    vec3 surfaceNormalG = computeNormalPerChannel(
+        coeff1g, coeff2g, coeff3g, coeff4g, coeff5g
+    );
+    vec3 surfaceNormalB = computeNormalPerChannel(
+        coeff1b, coeff2b, coeff3b, coeff4b, coeff5b
+    );
+    vec3 diffuseColor = computeDiffuseColor(
+        coeff1r, coeff2r, coeff3r, coeff4r, coeff5r, coeff6r,
+        coeff1g, coeff2g, coeff3g, coeff4g, coeff5g, coeff6g,
+        coeff1b, coeff2b, coeff3b, coeff4b, coeff5b, coeff6b,
+    );
 
-    float c1r = lu * lu * coeff1r;
-    float c2r = lv * lv * coeff2r;
-    float c3r = lu * lv * coeff3r;
-    float c4r = lu * coeff4r;
-    float c5r = lv * coeff5r;
-    float c6r = coeff6r;
-    float cr = c1r + c2r + c3r + c4r + c5r + c6r;
-
-    float c1g = lu * lu * coeff1g;
-    float c2g = lv * lv * coeff2g;
-    float c3g = lu * lv * coeff3g;
-    float c4g = lu * coeff4g;
-    float c5g = lv * coeff5g;
-    float c6g = coeff6g;
-    float cg = c1g + c2g + c3g + c4g + c5g + c6g;
-
-    float c1b = lu * lu * coeff1b;
-    float c2b = lv * lv * coeff2b;
-    float c3b = lu * lv * coeff3b;
-    float c4b = lu * coeff4b;
-    float c5b = lv * coeff5b;
-    float c6b = coeff6b;
-    float cb = c1b + c2b + c3b + c4b + c5b + c6b;
-    FragColor = vec4(cr * coeffRed, cg * coeffGreen, cb * coeffBlue, 1.0);
+    float redC = computeFragColorPerChannel(
+                    surfaceNormalR,
+                    attc.x,
+                    attc.y, attc.z,
+                    diffuseColor.x,
+                    diffuseCoeffs.x,
+                    ambientCoeffs.x,
+                    lightColor.x,  // ambient channel intensity
+                    diffuseColor.x,  // specular channel intensity
+                    specularCoeffs.x,
+                    lightColor.x,
+                    shininess,
+                    viewPos,
+                    FragPos,
+                    lightPos,
+                    blinn);
+    float greenC = computeFragColorPerChannel(
+                    surfaceNormalG,
+                    attc.x,
+                    attc.y, attc.z,
+                    diffuseColor.y,
+                    diffuseCoeffs.y,
+                    ambientCoeffs.y,
+                    lightColor.y,  // ambient channel intensity
+                    diffuseColor.y,  // specular channel intensity
+                    specularCoeffs.y,
+                    lightColor.y,  // light channel intensity
+                    shininess,
+                    viewPos,
+                    FragPos,
+                    lightPos,
+                    blinn);
+    float blueC = computeFragColorPerChannel(
+                    surfaceNormalB,
+                    attc.x,
+                    attc.y, attc.z,
+                    diffuseColor.z,
+                    diffuseCoeffs.z,
+                    ambientCoeffs.z,
+                    lightColor.z,  // ambient channel intensity
+                    diffuseColor.z,  // specular channel intensity
+                    specularCoeffs.z,
+                    lightColor.z,  // light channel intensity
+                    shininess,
+                    viewPos,
+                    FragPos,
+                    lightPos,
+                    blinn);
+    FragColor = vec4(redC, greenC, blueC, 1.0);
 }
+
+float computeLuPerChannel(float c0, float c1, float c2, float c3, float c4)
+{
+    // taken directly from the paper of Tom Malzbender, Dan Gelb, Hans Wolters
+    // http://www.hpl.hp.com/ptm
+    return ((c2 * c4) - (2 * c1 * c3)) / ((4 * c0 * c1) - (c2 * c2));
+}
+
+float computeLvPerChannel(float c0, float c1, float c2, float c3, float c4)
+{ 
+    // taken directly from the paper of Tom Malzbender, Dan Gelb, Hans Wolters
+    // http://www.hpl.hp.com/ptm
+    return ((c2 * c3) - (2 * c0 * c4)) / ((4 * c0 * c1) - (c2 * c2));
+}
+
+vec3 computeNormalPerChannel(float c0, float c1, float c2, float c3, float c4)
+{
+    // taken directly from the paper of Tom Malzbender, Dan Gelb, Hans Wolters
+    // http://www.hpl.hp.com/ptm
+    float Lu = computeLuPerChannel(float c0, float c1,
+                                   float c2, float c3,
+                                   float c4);
+    float Lv = computeLvPerChannel(float c0, float c1,
+                                   float c2, float c3,
+                                   float c4);
+
+    return vec3(Lu, Lv, sqrt(1 - (Lu * Lu) - (Lv * Lv));
+}
+
+float computeDiffuseColorPerChannel(float c0, float c1, float c2, float c3,
+                         float c4, float c5, float Lu, float Lv)
+{
+    // taken directly from the paper of Tom Malzbender, Dan Gelb, Hans Wolters
+    // http://www.hpl.hp.com/ptm
+    float term1 = c0 * Lu * Lu;
+    float term2 = c1 * Lv * Lv;
+    float term3 = c2 * Lu * Lv;
+    float term4 = c3 * Lu;
+    float term5 = c4 * Lv;
+    float term6 = c5;
+    return term1 + term2 + term3 + term4 + term5 + term6;
+}
+vec3 computeDiffuseColor(float c0r, float c1r,
+                         float c2r, float c3r,
+                         float c4r, float c5r,
+                         float c0g, float c1g,
+                         float c2g, float c3g,
+                         float c4g, float c5g,
+                         float c0b, float c1b,
+                         float c2b, float c3b,
+                         float c4b, float c5b)
+{
+    float LuR = computeLuPerChannel(
+        c1r, c2r, c3r, c4r, c5r, c6r
+    );
+    float LvR = computeLvPerChannel(
+        c1r, c2r, c3r, c4r, c5r, c6r
+    );
+    float LuG = computeLuPerChannel(
+        c1g, c2g, c3g, c4g, c5g, c6g
+    );
+    float LvG = computeLvPerChannel(
+        c1g, c2g, c3g, c4g, c5g, c6g
+    );
+    float LuB = computeLuPerChannel(
+        c1b, c2b, c3b, c4b, c5b, c6b
+    );
+    float LvB = computeLvPerChannel(
+        c1b, c2b, c3b, c4b, c5b, c6b
+    );
+    return vec3(
+    computeDiffuseColorPerChannel(c0r, c1r, c2r, c3r, c4r, c5r, LuR, LvR),
+    computeDiffuseColorPerChannel(c0g, c1g, c2g, c3g, c4g, c5g, LuG, LvG),
+    computeDiffuseColorPerChannel(c0b, c1b, c2b, c3b, c4b, c5b, LuB, LvB)
+    );
+}
+
+float computeAttenuation(float attC1, float attC2, float attC3, float dist)
+{
+    // f_att = min(\frac{1}{c_1 + c_2{\times}d_L + c_3{\times}d^2_{L}} , 1)
+    float distSqr = dist * dist;
+    float att1 = dist * attC2;
+    float att2 = distSqr * attC3;
+    float result = attC1 + att2 + att1;
+    result = 1 / result;
+    return min(result, 1);
+}
+
+float computeFragColorPerChannel(vec3 surfaceNormal, float attc1, 
+                                float attc2, float attc3,
+                                float objDiffuseChannelIntensity,
+                                float objDiffuseChannelCoeff,
+                                float ambientChannelCoeff,
+                                float ambientChannelIntensity,
+                                float specularChannelIntensity,
+                                float specularChannelCoeff,
+                                float lightChannelIntensity,
+                                float shininess, vec3 viewerPosition,
+                                vec3 fragPos, vec3 lightPosition,
+                                bool blinn)
+{
+    // blinn phong light illumination
+    float ambientTerm = ambientChannelIntensity * ambientChannelCoeff;
+    ambientTerm = ambientTerm * objDiffuseChannelIntensity;
+
+    // attenuation
+    float dist = distance(lightPosition, fragPos);
+    float fattr = computeAttenuation(attc1, attc2, attc3, dist);
+
+    // lambertian term
+    vec3 snormal = normalize(surfaceNormal);
+    vec3 lightDirection = normalize(lightPosition - fragPos);
+    float costheta = dot(lightDirection, snormal);
+    float lambertian = costheta * objDiffuseChannelCoeff;
+    lambertian = lambertian * objDiffuseChannelIntensity;
+    lambertian = lambertian * lightChannelIntensity;
+    lambertian = lambertian * fattr;
+
+    // specular term
+    vec3 viewerDirection = normalize(viewerPosition - fragPos);
+    float specAngle = 0.0;
+    if (blinn)
+    {
+        vec3 halfway = normalize(lightDirection + viewerDirection);
+        specAngle = max(dot(snormal, halfway), 0);
+    }else{
+        vec3 reflectionDir = reflect(-lightDirection, snormal);
+        specAngle = max(dot(viewerDirection, reflectionDir), 0);
+    }
+    float specTerm = specularChannelIntensity * specularChannelCoeff;
+    specTerm = pow(specAngle, shininess) * specTerm;
+    return ambientTerm + lambertian + specTerm;
+}
+
 """
 
 shaders = {
-    "quad": {"fragment": objectFshader, "vertex": objectVshader},
+    "quad": {
+        "fragment": quadFshader,
+        "vertex": quadVshader,
+        "attribute_info": {
+            "stride": None,
+            "aPos": {"layout": 0, "size": 3, "offset": 0},
+            "aNormal": {"layout": 1, "size": 3, "offset": 3},
+            "aTexCoord": {"layout": 2, "size": 2, "offset": 6},
+            "aTangent": {"layout": 3, "size": 3, "offset": 8},
+            "aBiTangent": {"layout": 4, "size": 3, "offset": 11},
+        },
+    },
+    "lambert": {
+        "fragment": lambertFshader,
+        "vertex": lambertVshader,
+        "attribute_info": {
+            "stride": None,
+            "aPos": {"layout": 0, "size": 3, "offset": 0},
+            "aNormal": {"layout": 1, "size": 3, "offset": 3},
+            "aTexCoord": {"layout": 2, "size": 2, "offset": 6},
+        },
+    },
     "quadPerChannel": {
-        "fragment": objectFshaderPerChannel,
-        "vertex": objectVshader,
+        "fragment": quadFshaderPerChannel,
+        "vertex": quadVshader,
+        "attribute_info": {
+            "stride": None,
+            "aPos": {"layout": 0, "size": 3, "offset": 0},
+            "aNormal": {"layout": 1, "size": 3, "offset": 3},
+            "aTexCoord": {"layout": 2, "size": 2, "offset": 6},
+            "aTangent": {"layout": 3, "size": 3, "offset": 8},
+            "aBiTangent": {"layout": 4, "size": 3, "offset": 11},
+        },
     },
     "quadPerChannelTest": {
-        "fragment": objectFshaderPerChannelTest,
-        "vertex": objectVshader,
+        "fragment": quadFshaderPerChannelTest,
+        "vertex": quadVshader,
+        "attribute_info": {
+            "stride": None,
+            "aPos": {"layout": 0, "size": 3, "offset": 0},
+            "aNormal": {"layout": 1, "size": 3, "offset": 3},
+            "aTexCoord": {"layout": 2, "size": 2, "offset": 6},
+            "aTangent": {"layout": 3, "size": 3, "offset": 8},
+            "aBiTangent": {"layout": 4, "size": 3, "offset": 11},
+        },
     },
-    "lamp": {"fragment": lampFshader, "vertex": lampVshader},
-    "rgbptm": {"fragment": rgbptmFshader, "vertex": rgbptmVshader},
+    "lamp": {
+        "fragment": lampFshader,
+        "vertex": lampVshader,
+        "attribute_info": {
+            "stride": None,
+            "aPos": {"layout": 0, "size": 3, "offset": 0},
+        },
+    },
+    "rgbptm": {
+        "fragment": rgbptmFshader,
+        "vertex": rgbptmVshader,
+        "attribute_info": {
+            "stride": None,
+            "aPos": {"layout": 0, "size": 3, "offset": 0},
+            "acoeff1r": {"layout": 1, "size": 1, "offset": 3},
+            "acoeff2r": {"layout": 2, "size": 1, "offset": 4},
+            "acoeff3r": {"layout": 3, "size": 1, "offset": 5},
+            "acoeff4r": {"layout": 4, "size": 1, "offset": 6},
+            "acoeff5r": {"layout": 5, "size": 1, "offset": 7},
+            "acoeff6r": {"layout": 6, "size": 1, "offset": 8},
+            "acoeff1g": {"layout": 7, "size": 1, "offset": 9},
+            "acoeff2g": {"layout": 8, "size": 1, "offset": 10},
+            "acoeff3g": {"layout": 9, "size": 1, "offset": 11},
+            "acoeff4g": {"layout": 10, "size": 1, "offset": 12},
+            "acoeff5g": {"layout": 11, "size": 1, "offset": 13},
+            "acoeff6g": {"layout": 12, "size": 1, "offset": 14},
+            "acoeff1b": {"layout": 13, "size": 1, "offset": 15},
+            "acoeff2b": {"layout": 14, "size": 1, "offset": 16},
+            "acoeff3b": {"layout": 15, "size": 1, "offset": 17},
+            "acoeff4b": {"layout": 16, "size": 1, "offset": 18},
+            "acoeff5b": {"layout": 17, "size": 1, "offset": 19},
+            "acoeff6b": {"layout": 18, "size": 1, "offset": 20},
+        },
+    },
 }

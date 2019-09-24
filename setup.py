@@ -29,7 +29,7 @@ setuptools.setup(
     install_requires=[
         "numpy",
         "pillow",
-        "PySide2"
+        #"PySide2"
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

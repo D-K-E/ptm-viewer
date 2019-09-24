@@ -14,7 +14,7 @@ import os
 from PIL import Image, ImageQt
 
 from ptmviewer.interface.window import Ui_MainWindow
-from ptmviewer.glwidget import PtmGLWidget
+from ptmviewer.glwidget import PtmLambertianGLWidget
 from ptmviewer.rgbptm import RGBPTM
 
 
@@ -87,7 +87,12 @@ class AppWindowFinal(AppWindowInit):
         cindex = self.fileList.indexFromItem(citem)
         ptmobj = self.ptmfiles[cindex]
         ptm = RGBPTM(ptmobj["path"])
-        self.viewerWidget = PtmGLWidget(
+        # vertices, indices = ptm.getVerticesAndSizeArr()
+        image = ptm.getImage()
+        image.save("img.png")
+        imqt = ImageQt.ImageQt(image)
+        self.viewerWidget = PtmLambertianGLWidget(
+                imqt
         )
         # self.viewerWidget = RectangleGL()
         info = self.viewerWidget.getGLInfo()

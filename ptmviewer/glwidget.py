@@ -28,7 +28,7 @@ from PySide2.QtCore import QCoreApplication
 from PySide2 import QtCore
 
 
-from shiboken2 import VoidPtr
+from PySide2.shiboken2 import VoidPtr
 import sys
 import numpy as np
 import os
@@ -57,13 +57,10 @@ except ImportError:
 from PySide2.QtWidgets import QOpenGLWidget
 
 
-class PtmGLWidget(QOpenGLWidget):
+class AbstractPtmGLWidget(QOpenGLWidget):
     "OpenGL widget"
 
-    def __init__(self, 
-            vertices: np.ndarray,
-            indices: np.ndarray,
-            parent=None):
+    def __init__(self, parent=None):
         QOpenGLWidget.__init__(self, parent)
         # camera
         self.camera = QtCamera()
@@ -79,30 +76,8 @@ class PtmGLWidget(QOpenGLWidget):
 
         # shaders
         self.shaders = shaders
-        self.attrLoc = {
-            "aPos": {"stride": 3, "offset": 0, "layout": 0},
-            "acoeff1r": {"stride": 1, "offset": 3, "layout": 1},
-            "acoeff2r": {"stride": 1, "offset": 4, "layout": 2},
-            "acoeff3r": {"stride": 1, "offset": 5, "layout": 3},
-            "acoeff4r": {"stride": 1, "offset": 6, "layout": 4},
-            "acoeff5r": {"stride": 1, "offset": 7, "layout": 5},
-            "acoeff6r": {"stride": 1, "offset": 8, "layout": 6},
-            "acoeff1g": {"stride": 1, "offset": 9, "layout": 7},
-            "acoeff2g": {"stride": 1, "offset": 10, "layout": 8},
-            "acoeff3g": {"stride": 1, "offset": 11, "layout": 9},
-            "acoeff4g": {"stride": 1, "offset": 12, "layout": 10},
-            "acoeff5g": {"stride": 1, "offset": 13, "layout": 11},
-            "acoeff6g": {"stride": 1, "offset": 14, "layout": 12},
-            "acoeff1b": {"stride": 1, "offset": 15, "layout": 13},
-            "acoeff2b": {"stride": 1, "offset": 16, "layout": 14},
-            "acoeff3b": {"stride": 1, "offset": 17, "layout": 15},
-            "acoeff4b": {"stride": 1, "offset": 18, "layout": 16},
-            "acoeff5b": {"stride": 1, "offset": 19, "layout": 17},
-            "acoeff6b": {"stride": 1, "offset": 20, "layout": 18},
-        }
+        self.attrLoc = {}
         self.rowsize = 0
-        for aName, aprop in self.attrLoc.items():
-            self.rowsize += aprop["stride"]
         # opengl data
 
         self.context = QOpenGLContext()
@@ -114,8 +89,11 @@ class PtmGLWidget(QOpenGLWidget):
         self.program = QOpenGLShaderProgram()
         self.lampProgram = QOpenGLShaderProgram()
         # vertices
-        self.vertices = vertices
-        self.indices = indices
+        self.vertices = None
+        self.indices = None
+
+        # texture
+        self.texture = None
 
         self.lampVertices = np.array(
             [  # first square for cube
@@ -234,12 +212,16 @@ class PtmGLWidget(QOpenGLWidget):
         self.rotVectorLamp = QVector3D(0.1, 0.2, 0.5)
         self.rotationAngle = 45.0
         #
-        self.worldLimitTop = 3.0 + imTopY
-        self.worldLimitBottom = -3.0 + imBottomY
-        self.worldLimitRight = 3.0 + imRightX
-        self.worldLimitLeft = -3.0 + imLeftX
+        self.worldLimitTop = 3.0  # + imTopY
+        self.worldLimitBottom = -3.0  # + imBottomY
+        self.worldLimitRight = 3.0  # + imRightX
+        self.worldLimitLeft = -3.0  # + imLeftX
         self.worldLimitDepthNeg = -20.0
         self.worldLimitDepthPos = 20.0
+
+    def setAttrLocFromShader(self, shaderName: str, shaderD: dict) -> None:
+        "Set attribute location dict from shader dict"
+        self.attrLoc[shaderName] = shaderD["attribute_info"]
 
     def loadShader(self, shaderName: str, shaderType: str, fromFile=True):
         "Load shader"
@@ -271,6 +253,30 @@ class PtmGLWidget(QOpenGLWidget):
     def loadFragmentShader(self, shaderName: str, fromFile=True):
         "load fragment shader"
         return self.loadShader(shaderName, "fragment", fromFile)
+
+    def linkShaders(
+        self, shaderName: str, program: QOpenGLShaderProgram, fromFile=True
+    ):
+        "Link shaders to program"
+        shaderD = self.shaders[shaderName]
+        self.setAttrLocFromShader(shaderName, shaderD)
+        self.setStride(shaderName)
+        vshader = self.loadVertexShader(shaderName, fromFile)
+        fshader = self.loadFragmentShader(shaderName, fromFile)
+        program.addShader(vshader)
+        program.addShader(fshader)
+        # bind attribute locations
+        for aname, aparams in self.attrLoc[shaderName].items():
+            if aname != "stride":
+                print("attribute name", aname)
+                print("attribute params:", aparams)
+                program.bindAttributeLocation(aname, aparams["layout"])
+        linked = program.link()
+        if not linked:
+            print("program linked:", linked)
+            print("failer log:", program.log())
+        #
+        return program
 
     def getGLInfo(self):
         "Get opengl info"
@@ -346,18 +352,6 @@ class PtmGLWidget(QOpenGLWidget):
         self.lamp.setIntensity(channel=channel, val=val)
         self.update()
 
-    def changeLampIntensityCoefficient(self, channel: str, val: float):
-        ""
-        availables = ["red", "green", "blue"]
-        if channel not in availables:
-            mess = "Unknown channel name " + channel
-            mess += ", available channels are: "
-            mess += "red, green, blue"
-            raise ValueError(mess)
-        #
-        self.lamp.setCoeffs(channel=channel, val=val)
-        self.update()
-
     def changeAmbientCoeffs(self, val: float):
         self.ambientCoeff = val
         self.update()
@@ -366,64 +360,32 @@ class PtmGLWidget(QOpenGLWidget):
         self.rotationAngle = val
         self.update()
 
-    def objectShader_init(self):
-        "Object shader initialization"
-        shader = "rgbptm"
-        vshader = self.loadVertexShader(shader, fromFile=False)
-        fshader = self.loadFragmentShader(shader, fromFile=False)
-        self.program.addShader(vshader)
-        self.program.addShader(fshader)
-        for attr, adict in self.attrLoc.items():
-            self.program.bindAttributeLocation(attr, adict["layout"])
-        linked = self.program.link()
-        print(shader, "shader linked: ", linked)
-
-    def setObjectUniforms_proc(self):
-        "set object shader uniforms"
-        self.program.setUniformValue("lightPos", self.lamp.position)
-        self.program.setUniformValue("coeffRed", self.lamp.color.x())
-        self.program.setUniformValue("coeffGreen", self.lamp.color.y())
-        self.program.setUniformValue("coeffBlue", self.lamp.color.z())
-
-    def lampShader_init(self):
-        "Lamp shader initialization"
-        shader = "lamp"
-        vshader = self.loadVertexShader(shader, fromFile=False)
-        fshader = self.loadFragmentShader(shader, fromFile=False)
-        self.lampProgram.addShader(vshader)
-        self.lampProgram.addShader(fshader)
-        self.lampProgram.bindAttributeLocation(
-            "aPos", self.attrLoc["aPos"]["layout"]
+    def createTexture(self, img: QImage, unit: int):
+        "create texture"
+        texture = QOpenGLTexture(QOpenGLTexture.Target2D)
+        texture.create()
+        texture.bind(unit)
+        texture.setData(img)
+        texture.setMinMagFilters(
+            QOpenGLTexture.Nearest, QOpenGLTexture.Nearest
         )
+        texture.setWrapMode(QOpenGLTexture.DirectionS, QOpenGLTexture.Repeat)
+        texture.setWrapMode(QOpenGLTexture.DirectionT, QOpenGLTexture.Repeat)
+        return texture
 
-        # lamp needs:
-        # projection, view, model
-        linked = self.lampProgram.link()
-        print("lamp shader linked: ", linked)
-
-    def setLampShaderUniforms(self):
-        "set lamp shader uniforms"
-        projection = QMatrix4x4()
-        projection.perspective(
-            self.camera.zoom, self.width() / self.height(), 0.2, 100.0
-        )
-        view = self.camera.getViewMatrix()
-        model = QMatrix4x4()
-        model.translate(self.lamp.position)
-        model.rotate(self.rotationAngle, self.rotVectorLamp)
-        self.lampProgram.setUniformValue("projection", projection)
-        self.lampProgram.setUniformValue("view", view)
-        self.lampProgram.setUniformValue("model", model)
-        self.lampProgram.setUniformValue("lightColor", self.lamp.color)
+    def setStride(self, shaderName: str) -> None:
+        "set row size for vertex array buffer"
+        stride = 0
+        for aName, aprop in self.attrLoc[shaderName].items():
+            if isinstance(aprop, dict):
+                stride += aprop["size"]
+        self.attrLoc[shaderName]["stride"] = stride
 
     def cleanUpGL(self):
         "Clean up everything"
         self.context.makeCurrent()
-        self.releaseTextures_proc()
         del self.program
-        del self.lampProgram
         self.program = None
-        self.lampProgram = None
         self.doneCurrent()
 
     def resizeGL(self, width: int, height: int):
@@ -444,82 +406,326 @@ class PtmGLWidget(QOpenGLWidget):
         funcs.glEnable(pygl.GL_CULL_FACE)
 
         # load shaders: lamp shader, object shader
-        # initialize shaders
+        # create shader program
         self.program = QOpenGLShaderProgram(self.context)
-        self.objectShader_init()
-        print("object init done")
+        # add shaders to program
+        shaderName = ""
+        self.program = self.linkShaders(
+            shaderName, program=self.program, fromFile=False
+        )
+
         isb = self.program.bind()
-        print("object shader bound: ", isb)
-        # set uniforms to shaders
-        floatSize = ctypes.sizeof(ctypes.c_float)
         self.vbo.create()
         self.vbo.bind()
+        self.vao.create()
+        isVaoBind = self.vao.bind()
+        print("vao bound:", isVaoBind)
+        #
+        self.vbo.create()
+        isVboBind = self.vbo.bind()
+        print("vbo bound:", isVboBind)
+        #
+        floatSize = ctypes.sizeof(ctypes.c_float)
+        # allocate buffer
         self.vbo.allocate(
             self.vertices.tobytes(), self.vertices.size * floatSize
         )
-        self.vbo.bind()
-        for aname, aprop in self.attrLoc.items():
-            self.program.enableAttributeArray(aprop["layout"])
-            self.program.setAttributeBuffer(
-                aprop["layout"],
-                pygl.GL_FLOAT,
-                self.attrLoc["aPos"]["offset"],  # 0
-                self.attrLoc["aPos"]["stride"],  # tuple Size: vec3
-                self.attrLoc["aPos"]["stride"] * floatSize,
-            )
+        # enable given attribute and attribute pointer
+        attrName = ""
+        rowsize = 1
+        funcs.glEnableVertexAttribArray(self.attrLoc[attrName]["layout"])
+        funcs.glVertexAttribPointer(
+            self.attrLoc[attrName]["layout"],
+            self.attrLoc[attrName]["size"],
+            int(pygl.GL_FLOAT),
+            int(pygl.GL_FALSE),
+            rowsize * floatSize,
+            VoidPtr(self.attrLoc[attrName]["offset"] * floatSize),
+        )
+        # activate texture
+        self.texture = self.createTexture()
+        # release ressources to bind other objects to opengl
+        self.vbo.release()
+        self.vao.release()
+        self.program.release()
 
+        # create shader program
         self.lampProgram = QOpenGLShaderProgram(self.context)
-        self.lampShader_init()
-        print("lamp init done")
-        # set vao and vbo for shaders
-        isb = self.lampProgram.bind()
-        print("lamp shader bound: ", isb)
+        # add shaders to program
+        shaderName = ""
+        self.lampProgram = self.linkShaders(
+            shaderName, program=self.lampProgram, fromFile=False
+        )
 
-        floatSize = ctypes.sizeof(ctypes.c_float)
-        # lamp vbo
+        self.lampProgram.bind()
+        # do the same for other vaos and vbos
+        self.lampVao.create()
+        isVao = self.lampVao.bind()
+        print("lamp vao bound:", isVao)
+
         self.lampVbo.create()
-        self.lampVbo.bind()
-        self.lampVbo.allocate(
-            self.lampVertices.tobytes(), self.lampVertices.size * floatSize
+        isVbo = self.lampVbo.bind()
+        print("lamp vbo bound:", isVbo)
+        data = np.array([], dtype=ctypes.c_float)
+        self.lampVbo.allocate(data.tobytes(), data.size * floatSize)
+        # enable attribute and attribute pointer
+        funcs.glEnableVertexAttribArray(self.attrLoc[attrName]["layout"])
+        funcs.glVertexAttribPointer(
+            self.attrLoc[attrName]["layout"],
+            self.attrLoc[attrName]["size"],
+            int(pygl.GL_FLOAT),
+            int(pygl.GL_FALSE),
+            rowsize * floatSize,
+            VoidPtr(self.attrLoc[attrName]["offset"] * floatSize),
         )
-        self.lampVbo.bind()
-        self.lampProgram.enableAttributeArray(self.attrLoc["aPos"]["layout"])
-        self.lampProgram.setAttributeBuffer(
-            self.attrLoc["aPos"]["layout"],  # layout location 0
-            pygl.GL_FLOAT,
-            self.attrLoc["aPos"]["offset"],  # 0
-            self.attrLoc["aPos"]["stride"],  # tuple Size: vec3
-            self.attrLoc["aPos"]["stride"] * floatSize,
-        )
+        # release ressources to bind other objects to open gl
+        self.lampVbo.release()
+        self.lampVao.release()
+        self.lampProgram.release()
 
     def paintGL(self):
         "drawing loop"
         funcs = self.context.functions()
         # clean up what was drawn
         funcs.glClear(pygl.GL_COLOR_BUFFER_BIT | pygl.GL_DEPTH_BUFFER_BIT)
-        # bind shader: object
+        # bind shader: object, use shader
         self.program.bind()
-        # set uniforms to shader
-        self.setObjectUniforms_proc()
+        # bind vao, vbo
+        self.vao.bind()
         # bind texture
-        self.vbo.bind()
-        self.program.bind()
-        funcs.glDrawElements(pygl.GL_POINTS, self.indices.size,
-                pygl.GL_UNSIGNED_INT, self.indices.tobytes())
+        self.texture.bind()
+        # render everything
+        vboData = np.array([], dtype=ctypes.c_float)
+        funcs.glDrawArrays(pygl.GL_TRIANGLES, 0, vboData.size)
 
-        # end render viewer
-        # self.releaseTextures_proc()
-        self.vbo.release()
-        self.program.release()
 
-        # bind shader: lamp
+class PtmLambertianGLWidget(AbstractPtmGLWidget):
+    "OpenGL widget that displays ptm diffuse map"
+
+    def __init__(self, ptmImage: QImage, parent=None):
+        super().__init__(parent)
+        self.img = ptmImage.mirrored()
+        self.texUnit = 0
+        self.texture = None
+
+        # fmt: off
+        self.vertices = np.array(
+            [
+                # position       # normal       # texture coordinates
+                0.7, 0.7, -3.0, 0.0, 0.0, -1.0, 1.0, 1.0,  # top right
+                0.7, -0.7, -3.0, 0.0, 0.0, -1.0, 1.0, 0.0,  # bottom right
+                -0.7, -0.7, -3.0, 0.0, 0.0, -1.0, 0.0, 0.0,  # bottom left
+
+                -0.7, 0.7, -3.0, 0.0, 0.0, -1.0, 0.0, 1.0,  # top left
+                0.7, 0.7, -3.0, 0.0, 0.0, -1.0, 1.0, 1.0,  # top right
+                -0.7, -0.7, -3.0, 0.0, 0.0, -1.0, 0.0, 0.0,  # bottom left
+            ],
+            dtype=ctypes.c_float,
+        )
+        # fmt: on
+
+    def cleanUpGL(self):
+        self.context.makeCurrent()
+        del self.program
+        del self.lampProgram
+        self.program = None
+        self.lampProgram = None
+        self.texture.destroy()
+        self.vbo.destroy()
+        self.lampVbo.destroy()
+        self.doneCurrent()
+
+    def setShaderUniforms(self):
+        "set shader uniforms"
+        projectionMatrix = QMatrix4x4()
+        projectionMatrix.perspective(
+            self.camera.zoom, self.width() / self.height(), 0.2, 100.0
+        )
+        viewMatrix = self.camera.getViewMatrix()
+        model = QMatrix4x4()
+        color = self.lamp.color
+        pos = self.lamp.position
+        self.program.setUniformValue("projection", projectionMatrix)
+        self.program.setUniformValue("view", viewMatrix)
+        self.program.setUniformValue("model", model)
+        self.program.setUniformValue("lightColor", color)
+        self.program.setUniformValue("lightPos", pos)
+        # self.program.setUniformValue("diffuseMap", self.texUnit)
+
+    def setLampShaderUniforms_proc(self):
+        "set lamp shader uniforms in paintgl"
+        projectionMatrix = QMatrix4x4()
+        projectionMatrix.perspective(
+            self.camera.zoom, self.width() / self.height(), 0.2, 100.0
+        )
+        viewMatrix = self.camera.getViewMatrix()
+        lampModel = QMatrix4x4()
+        lampModel.translate(self.lamp.position)
+        lampModel.rotate(self.rotationAngle, self.rotVectorLamp)
+        self.lampProgram.setUniformValue("projection", projectionMatrix)
+        self.lampProgram.setUniformValue("view", viewMatrix)
+        self.lampProgram.setUniformValue("model", lampModel)
+        self.lampProgram.setUniformValue("lightColor", self.lamp.color)
+
+    def initializeGL(self):
+        "Initialize gl"
+        self.context.create()
+        self.context.aboutToBeDestroyed.connect(self.cleanUpGL)
+
+        # initialize functions
+        funcs = self.context.functions()
+        funcs.initializeOpenGLFunctions()
+        funcs.glClearColor(0.0, 0.4, 0.4, 0)
+        funcs.glEnable(pygl.GL_DEPTH_TEST)
+        funcs.glEnable(pygl.GL_TEXTURE_2D)
+
+        floatSize = ctypes.sizeof(ctypes.c_float)
+        # create lamp shader
+        self.lampProgram = QOpenGLShaderProgram(self.context)
+        shname = "lamp"
+        vshader = self.loadVertexShader(shname, fromFile=False)
+        fshader = self.loadFragmentShader(shname, fromFile=False)
+        shaderD = self.shaders[shname]
+        self.setAttrLocFromShader(shname, shaderD)
+        self.setStride(shname)
+        self.lampProgram.addShader(vshader)
+        self.lampProgram.addShader(fshader)
+        self.lampProgram.bindAttributeLocation("aPos", 0)
+        linked = self.lampProgram.link()
+        if not linked:
+            print("program linked:", linked)
+            print("failer log:", self.lampProgram.log())
+
         self.lampProgram.bind()
-        # self.lampVbo.bind()
-        # set uniforms to shader
-        self.setLampShaderUniforms()
-        # render lamp
-        funcs.glDrawArrays(pygl.GL_TRIANGLES, 0, 36)
+
+        # create object shader
+        self.program = QOpenGLShaderProgram(self.context)
+        shname = "lambert"
+        vshader = self.loadVertexShader(shname, fromFile=False)
+        fshader = self.loadFragmentShader(shname, fromFile=False)
+        shaderD = self.shaders[shname]
+        self.setAttrLocFromShader(shname, shaderD)
+        self.setStride(shname)
+        self.program.addShader(vshader)
+        self.program.addShader(fshader)
+        self.program.bindAttributeLocation("aPos", 0)
+        self.program.bindAttributeLocation("aNormal", 1)
+        self.program.bindAttributeLocation("aTexCoord", 2)
+        linked = self.program.link()
+        if not linked:
+            print("program linked:", linked)
+            print("failer log:", self.program.log())
+        #
+        self.program.bind()
+        self.program.setUniformValue("diffuseMap", self.texUnit)
+
+        # lamp: vbo
+        self.lampVbo.create()
+        self.lampVbo.bind()
+        self.lampVbo.allocate(
+            self.lampVertices.tobytes(), self.lampVertices.size * floatSize
+        )
+        print("lamp vbo size:", self.lampVbo.size())
+
+        # lamp: vao
+        self.lampVao.create()
+        self.lampVao.bind()
+        # position
+        attrName = "aPos"
+        shname = "lamp"
+        stride = self.attrLoc[shname]["stride"] * floatSize
+        layout = self.attrLoc[shname][attrName]["layout"]
+        size = self.attrLoc[shname][attrName]["size"]
+        offset = self.attrLoc[shname][attrName]["offset"] * floatSize
+        funcs.glEnableVertexAttribArray(layout)
+        funcs.glVertexAttribPointer(
+            layout,
+            size,
+            int(pygl.GL_FLOAT),
+            int(pygl.GL_FALSE),
+            stride,
+            VoidPtr(offset),
+        )
+        # end lamp: vao, vbo
+
+        # object: vbo, vao
+        self.vbo.create()
+        self.vbo.bind()
+        self.vbo.allocate(
+            self.vertices.tobytes(), self.vertices.size * floatSize
+        )
+        print("vbo size:", self.vbo.size())
+        #
+        self.vao.create()
+        self.vao.bind()
+        #
+        shname = "lambert"
+        stride = self.attrLoc[shname]["stride"] * floatSize
+        # position
+        attrName = "aPos"
+        layout = self.attrLoc[shname][attrName]["layout"]
+        size = self.attrLoc[shname][attrName]["size"]
+        offset = self.attrLoc[shname][attrName]["offset"] * floatSize
+        funcs.glEnableVertexAttribArray(layout)
+        funcs.glVertexAttribPointer(
+            layout,
+            size,
+            int(pygl.GL_FLOAT),
+            int(pygl.GL_FALSE),
+            stride,
+            VoidPtr(offset),
+        )
+        #
+        # normal
+        attrName = "aNormal"
+        layout = self.attrLoc[shname][attrName]["layout"]
+        size = self.attrLoc[shname][attrName]["size"]
+        offset = self.attrLoc[shname][attrName]["offset"] * floatSize
+        funcs.glEnableVertexAttribArray(layout)
+        funcs.glVertexAttribPointer(
+            layout,
+            size,
+            int(pygl.GL_FLOAT),
+            int(pygl.GL_FALSE),
+            stride,
+            VoidPtr(offset),
+        )
+        #
+        # texture coord
+        attrName = "aTexCoord"
+        layout = self.attrLoc[shname][attrName]["layout"]
+        size = self.attrLoc[shname][attrName]["size"]
+        offset = self.attrLoc[shname][attrName]["offset"] * floatSize
+        funcs.glEnableVertexAttribArray(layout)
+        funcs.glVertexAttribPointer(
+            layout,
+            size,
+            int(pygl.GL_FLOAT),
+            int(pygl.GL_FALSE),
+            stride,
+            VoidPtr(offset),
+        )
+        #
+        # create texture
+        self.texture = self.createTexture(img=self.img, unit=self.texUnit)
         self.lampVbo.release()
-        self.lampProgram.release()
-        # self.program.bind()
-        # self.renderViewer()
+        self.vbo.release()
+        self.vao.release()
+
+    def paintGL(self):
+        "paint gl drawing loop"
+        funcs = self.context.functions()
+        funcs.glClear(pygl.GL_COLOR_BUFFER_BIT | pygl.GL_DEPTH_BUFFER_BIT)
+        #
+        # render object
+        self.vao.bind()
+        self.program.bind()
+        self.setShaderUniforms()
+        self.texture.bind()
+        funcs.glDrawArrays(pygl.GL_TRIANGLES, 0, 6)
+
+        # render lamp
+        self.lampVao.bind()
+        self.lampProgram.bind()
+        self.setLampShaderUniforms_proc()
+        funcs.glDrawArrays(pygl.GL_TRIANGLES, 0, 36)
