@@ -422,7 +422,12 @@ class AbstractPointLightPtmGLWidget(QOpenGLWidget):
         "Clean up everything"
         self.context.makeCurrent()
         del self.program
+        del self.lampProgram
         self.program = None
+        self.lampProgram = None
+        self.vbo.destroy()
+        self.lampVbo.destroy()
+        [tdict["texture"].destroy() for tdict in self.textures]
         self.doneCurrent()
 
     def resizeGL(self, width: int, height: int):
@@ -567,17 +572,6 @@ class PtmLambertianGLWidget(AbstractPointLightPtmGLWidget):
             dtype=ctypes.c_float,
         )
         # fmt: on
-
-    def cleanUpGL(self):
-        self.context.makeCurrent()
-        del self.program
-        del self.lampProgram
-        self.program = None
-        self.lampProgram = None
-        self.texture.destroy()
-        self.vbo.destroy()
-        self.lampVbo.destroy()
-        self.doneCurrent()
 
     def setObjectShaderUniforms_proc(self):
         "set shader uniforms"
