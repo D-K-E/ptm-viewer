@@ -89,7 +89,6 @@ class AppWindowFinal(AppWindowInit):
         ptm = RGBPTM(ptmobj["path"])
         # vertices, indices = ptm.getVerticesAndSizeArr()
         image = ptm.getImage()
-        image.save("img.png")
         imqt = ImageQt.ImageQt(image)
         self.viewerWidget = PtmLambertianGLWidget(
                 imqt

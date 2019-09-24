@@ -608,9 +608,10 @@ class PtmLambertianGLWidget(AbstractPtmGLWidget):
         self.setStride(shname)
         self.program.addShader(vshader)
         self.program.addShader(fshader)
-        self.program.bindAttributeLocation("aPos", 0)
-        self.program.bindAttributeLocation("aNormal", 1)
-        self.program.bindAttributeLocation("aTexCoord", 2)
+        for aname, adict in self.attrLoc[shname].items():
+            if aname != "stride":
+                layout = adict["layout"]
+                self.program.bindAttributeLocation(aname, layout)
         linked = self.program.link()
         if not linked:
             print("program linked:", linked)
