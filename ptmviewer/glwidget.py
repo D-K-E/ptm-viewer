@@ -254,30 +254,6 @@ class AbstractPtmGLWidget(QOpenGLWidget):
         "load fragment shader"
         return self.loadShader(shaderName, "fragment", fromFile)
 
-    def linkShaders(
-        self, shaderName: str, program: QOpenGLShaderProgram, fromFile=True
-    ):
-        "Link shaders to program"
-        shaderD = self.shaders[shaderName]
-        self.setAttrLocFromShader(shaderName, shaderD)
-        self.setStride(shaderName)
-        vshader = self.loadVertexShader(shaderName, fromFile)
-        fshader = self.loadFragmentShader(shaderName, fromFile)
-        program.addShader(vshader)
-        program.addShader(fshader)
-        # bind attribute locations
-        for aname, aparams in self.attrLoc[shaderName].items():
-            if aname != "stride":
-                print("attribute name", aname)
-                print("attribute params:", aparams)
-                program.bindAttributeLocation(aname, aparams["layout"])
-        linked = program.link()
-        if not linked:
-            print("program linked:", linked)
-            print("failer log:", program.log())
-        #
-        return program
-
     def getGLInfo(self):
         "Get opengl info"
         info = "Vendor: {0}, Renderer: {1}, OpenGL Version: {2}, Shader Version: {3}".format(
@@ -380,6 +356,42 @@ class AbstractPtmGLWidget(QOpenGLWidget):
             if isinstance(aprop, dict):
                 stride += aprop["size"]
         self.attrLoc[shaderName]["stride"] = stride
+
+    def lampShader_init(self, shname: str):
+        "lamp shader initialization"
+        vshader = self.loadVertexShader(shname, fromFile=False)
+        fshader = self.loadFragmentShader(shname, fromFile=False)
+        shaderD = self.shaders[shname]
+        self.setAttrLocFromShader(shname, shaderD)
+        self.setStride(shname)
+        self.lampProgram.addShader(vshader)
+        self.lampProgram.addShader(fshader)
+        for aname, adict in self.attrLoc[shname].items():
+            if aname != "stride":
+                layout = adict["layout"]
+                self.lampProgram.bindAttributeLocation(aname, layout)
+        linked = self.lampProgram.link()
+        if not linked:
+            print("program linked:", linked)
+            print("failer log:", self.lampProgram.log())
+
+    def programShader_init(self, shname: str):
+        "Initialize program shader"
+        vshader = self.loadVertexShader(shname, fromFile=False)
+        fshader = self.loadFragmentShader(shname, fromFile=False)
+        shaderD = self.shaders[shname]
+        self.setAttrLocFromShader(shname, shaderD)
+        self.setStride(shname)
+        self.program.addShader(vshader)
+        self.program.addShader(fshader)
+        for aname, adict in self.attrLoc[shname].items():
+            if aname != "stride":
+                layout = adict["layout"]
+                self.program.bindAttributeLocation(aname, layout)
+        linked = self.program.link()
+        if not linked:
+            print("program linked:", linked)
+            print("failer log:", self.program.log())
 
     def cleanUpGL(self):
         "Clean up everything"
@@ -535,25 +547,7 @@ class PtmLambertianGLWidget(AbstractPtmGLWidget):
         self.lampVbo.destroy()
         self.doneCurrent()
 
-    def programShader_init(self):
-        "Initialize program shader"
-        shname = "lambert"
-        vshader = self.loadVertexShader(shname, fromFile=False)
-        fshader = self.loadFragmentShader(shname, fromFile=False)
-        shaderD = self.shaders[shname]
-        self.setAttrLocFromShader(shname, shaderD)
-        self.setStride(shname)
-        self.program.addShader(vshader)
-        self.program.addShader(fshader)
-        for aname, adict in self.attrLoc[shname].items():
-            if aname != "stride":
-                layout = adict["layout"]
-                self.program.bindAttributeLocation(aname, layout)
-        linked = self.program.link()
-        if not linked:
-            print("program linked:", linked)
-            print("failer log:", self.program.log())
-
+    
     def setShaderUniforms(self):
         "set shader uniforms"
         projectionMatrix = QMatrix4x4()
@@ -569,26 +563,6 @@ class PtmLambertianGLWidget(AbstractPtmGLWidget):
         self.program.setUniformValue("model", model)
         self.program.setUniformValue("lightColor", color)
         self.program.setUniformValue("lightPos", pos)
-        # self.program.setUniformValue("diffuseMap", self.texUnit)
-
-    def lampShader_init(self):
-        "lamp shader initialization"
-        shname = "lamp"
-        vshader = self.loadVertexShader(shname, fromFile=False)
-        fshader = self.loadFragmentShader(shname, fromFile=False)
-        shaderD = self.shaders[shname]
-        self.setAttrLocFromShader(shname, shaderD)
-        self.setStride(shname)
-        self.lampProgram.addShader(vshader)
-        self.lampProgram.addShader(fshader)
-        for aname, adict in self.attrLoc[shname].items():
-            if aname != "stride":
-                layout = adict["layout"]
-                self.lampProgram.bindAttributeLocation(aname, layout)
-        linked = self.lampProgram.link()
-        if not linked:
-            print("program linked:", linked)
-            print("failer log:", self.lampProgram.log())
 
     def setLampShaderUniforms_proc(self):
         "set lamp shader uniforms in paintgl"
@@ -617,15 +591,18 @@ class PtmLambertianGLWidget(AbstractPtmGLWidget):
         funcs.glEnable(pygl.GL_DEPTH_TEST)
         funcs.glEnable(pygl.GL_TEXTURE_2D)
 
+        # vars to be used in initialization
         floatSize = ctypes.sizeof(ctypes.c_float)
+        lampShaderName = "lamp"
+        objectShaderName = "lambert"
         # create lamp shader
         self.lampProgram = QOpenGLShaderProgram(self.context)
-        self.lampShader_init()
+        self.lampShader_init(lampShaderName)
         self.lampProgram.bind()
 
         # create object shader
         self.program = QOpenGLShaderProgram(self.context)
-        self.programShader_init()
+        self.programShader_init(objectShaderName)
         self.program.bind()
         self.program.setUniformValue("diffuseMap", self.texUnit)
 
@@ -639,10 +616,9 @@ class PtmLambertianGLWidget(AbstractPtmGLWidget):
         # lamp: vao
         self.lampVao.create()
         self.lampVao.bind()
-        shname = "lamp"
-        stride = self.attrLoc[shname]["stride"] * floatSize
+        stride = self.attrLoc[lampShaderName]["stride"] * floatSize
         # position
-        for attrName, adict in self.attrLoc[shname].items():
+        for attrName, adict in self.attrLoc[lampShaderName].items():
             if attrName != "stride":
                 layout = adict["layout"]
                 size = adict["size"]
@@ -656,6 +632,8 @@ class PtmLambertianGLWidget(AbstractPtmGLWidget):
                     stride,
                     VoidPtr(offset))
         # end lamp: vao, vbo
+        self.lampVao.release()
+        self.lampVbo.release()
 
         # object: vbo, vao
         self.vbo.create()
@@ -667,9 +645,8 @@ class PtmLambertianGLWidget(AbstractPtmGLWidget):
         self.vao.create()
         self.vao.bind()
         #
-        shname = "lambert"
-        stride = self.attrLoc[shname]["stride"] * floatSize
-        for attrName, adict in self.attrLoc[shname].items():
+        stride = self.attrLoc[objectShaderName]["stride"] * floatSize
+        for attrName, adict in self.attrLoc[objectShaderName].items():
             if attrName != "stride":
                 layout = adict["layout"]
                 size = adict["size"]
@@ -682,12 +659,11 @@ class PtmLambertianGLWidget(AbstractPtmGLWidget):
                     int(pygl.GL_FALSE),
                     stride,
                     VoidPtr(offset))
-        #
-        # create texture
-        self.texture = self.createTexture(img=self.img, unit=self.texUnit)
-        self.lampVbo.release()
+        # end object: vbo, vao
         self.vbo.release()
         self.vao.release()
+        # create texture
+        self.texture = self.createTexture(img=self.img, unit=self.texUnit)
 
     def paintGL(self):
         "paint gl drawing loop"
@@ -706,3 +682,78 @@ class PtmLambertianGLWidget(AbstractPtmGLWidget):
         self.lampProgram.bind()
         self.setLampShaderUniforms_proc()
         funcs.glDrawArrays(pygl.GL_TRIANGLES, 0, 36)
+
+class PtmNormalMapGLWidget(AbstractPtmGLWidget):
+    "Opengl widget that displays ptm diffuse map and a normal map"
+
+    def __init__(self, ptmImage: QImage, normalMap: QImage, parent=None):
+        super().__init__(parent)
+        self.img = ptmImage.mirrored()
+        self.normal = normalMap.mirrored()
+        self.texUnit1 = 0
+        self.texUnit2 = 1
+        self.texture1 = None
+        self.texture2 = None
+
+        # fmt: off
+        self.vertices = np.array([], dtype=ctypes.c_float)
+
+        # fmt: on
+
+    def lampShader_init(self):
+        "lamp shader initialization"
+        shname = "lamp"
+        vshader = self.loadVertexShader(shname, fromFile=False)
+        fshader = self.loadFragmentShader(shname, fromFile=False)
+        shaderD = self.shaders[shname]
+        self.setAttrLocFromShader(shname, shaderD)
+        self.setStride(shname)
+        self.lampProgram.addShader(vshader)
+        self.lampProgram.addShader(fshader)
+        for aname, adict in self.attrLoc[shname].items():
+            if aname != "stride":
+                layout = adict["layout"]
+                self.lampProgram.bindAttributeLocation(aname, layout)
+        linked = self.lampProgram.link()
+        if not linked:
+            print("program linked:", linked)
+            print("failer log:", self.lampProgram.log())
+
+    def cleanUpGL(self):
+        self.context.makeCurrent()
+        del self.program
+        del self.lampProgram
+        self.program = None
+        self.lampProgram = None
+        self.texture1.destroy()
+        self.texture2.destroy()
+        self.vbo.destroy()
+        self.lampVbo.destroy()
+        self.doneCurrent()
+
+    def initializeGL(self):
+        "initialize gl widget"
+        self.context.create()
+        self.context.aboutToBeDestroyed.connect(self.cleanUpGL)
+
+        # initialize functions
+        funcs = self.context.functions()
+        funcs.initializeOpenGLFunctions()
+        funcs.glClearColor(0.0, 0.4, 0.4, 0)
+        funcs.glEnable(pygl.GL_DEPTH_TEST)
+        funcs.glEnable(pygl.GL_TEXTURE_2D)
+
+        floatSize = ctypes.sizeof(ctypes.c_float)
+
+        # create lamp shader
+        self.lampProgram = QOpenGLShaderProgram(self.context)
+        self.lampShader_init()
+        self.lampProgram.bind()
+
+        # create object shader
+        self.program = QOpenGLShaderProgram(self.context)
+
+        self.program.bind()
+        self.program.setUniformValue("diffuseMap", self.texUnit1)
+        self.program.setUniformValue("normalMap", self.texUnit2)
+

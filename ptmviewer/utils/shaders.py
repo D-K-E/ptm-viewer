@@ -147,11 +147,11 @@ quadVshader = """
 #version 330 core
 
 // specify input
-layout (location = 0) in vec3 aPos;
-layout (location = 1) in vec3 aNormal;
-layout (location = 2) in vec2 aTexCoord;
-layout (location = 3) in vec3 aTangent;
-layout (location = 4) in vec3 aBiTangent;
+in vec3 aPos;
+in vec3 aNormal;
+in vec2 aTexCoord;
+in vec3 aTangent;
+in vec3 aBiTangent;
 
 // specify output
 out vec3 FragPos;
