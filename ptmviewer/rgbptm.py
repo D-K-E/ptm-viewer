@@ -170,8 +170,9 @@ class RGBPTM(PTMFileParse):
         components of the VAO has to be position in 3d coordinates
         """
         vertices = np.empty((self.imheight, self.imwidth, 21), dtype=c_float)
-        indices = np.array([i for i in range(self.imheight * self.imwidth)],
-                dtype=c_uint)
+        indices = np.array(
+            [i for i in range(self.imheight * self.imwidth)], dtype=c_uint
+        )
         rcoeff = self.imcoeffs[0, :, :]
         rcoeff = rcoeff.reshape((self.imheight, self.imwidth, 6))
         gcoeff = self.imcoeffs[1, :, :]

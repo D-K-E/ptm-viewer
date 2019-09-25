@@ -6,6 +6,9 @@ from PySide2.QtGui import QVector3D
 from PySide2.QtGui import QVector4D
 from PySide2.QtGui import QMatrix4x4
 
+from typing import Tuple, List, Dict
+import math
+
 
 def normalize_1d_array(arr):
     "Normalize 1d array"
@@ -297,9 +300,9 @@ def arr2qmat(arr: np.ndarray):
 
 def move3dObjPure(
     direction: str,
-    positionVector: (float, float, float),
-    axvec1: (float, float, float),
-    axvec2: (float, float, float),
+    positionVector: Tuple[float, float, float],
+    axvec1: Tuple[float, float, float],
+    axvec2: Tuple[float, float, float],
     deltaTime: float,
     speed: float,
     availableMoves=["forward", "backward", "left", "right"],

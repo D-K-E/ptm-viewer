@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'interface.ui'
 #
-# Created by: PyQt5 UI code generator 5.6
+# Created by: PyQt5 UI code generator 5.9.2
 #
 # WARNING! All changes made in this file will be lost!
 
@@ -18,23 +18,22 @@ class Ui_MainWindow(object):
         self.verticalLayout_22.setObjectName("verticalLayout_22")
         self.horizontalLayout_2 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_2.setObjectName("horizontalLayout_2")
-        self.verticalLayout_2 = QtWidgets.QVBoxLayout()
-        self.verticalLayout_2.setObjectName("verticalLayout_2")
+        self.viewerLayout = QtWidgets.QVBoxLayout()
+        self.viewerLayout.setObjectName("viewerLayout")
         self.label_2 = QtWidgets.QLabel(self.centralwidget)
         self.label_2.setObjectName("label_2")
-        self.verticalLayout_2.addWidget(self.label_2)
+        self.viewerLayout.addWidget(self.label_2)
         self.viewerWidget = QtWidgets.QOpenGLWidget(self.centralwidget)
         self.viewerWidget.setObjectName("viewerWidget")
-        self.verticalLayout_2.addWidget(self.viewerWidget)
-        self.verticalLayout_2.setStretch(1, 1)
-        self.horizontalLayout_2.addLayout(self.verticalLayout_2)
+        self.viewerLayout.addWidget(self.viewerWidget)
+        self.viewerLayout.setStretch(1, 1)
+        self.horizontalLayout_2.addLayout(self.viewerLayout)
         self.toolBox = QtWidgets.QToolBox(self.centralwidget)
         self.toolBox.setObjectName("toolBox")
         self.ViewerPage = QtWidgets.QWidget()
         self.ViewerPage.setGeometry(QtCore.QRect(0, 0, 367, 624))
         self.ViewerPage.setObjectName("ViewerPage")
         self.verticalLayout_20 = QtWidgets.QVBoxLayout(self.ViewerPage)
-        self.verticalLayout_20.setContentsMargins(0, 0, 0, 0)
         self.verticalLayout_20.setObjectName("verticalLayout_20")
         self.verticalLayout_15 = QtWidgets.QVBoxLayout()
         self.verticalLayout_15.setObjectName("verticalLayout_15")
@@ -274,7 +273,6 @@ class Ui_MainWindow(object):
         self.ImageListPage.setGeometry(QtCore.QRect(0, 0, 278, 624))
         self.ImageListPage.setObjectName("ImageListPage")
         self.verticalLayout_21 = QtWidgets.QVBoxLayout(self.ImageListPage)
-        self.verticalLayout_21.setContentsMargins(0, 0, 0, 0)
         self.verticalLayout_21.setObjectName("verticalLayout_21")
         self.fileList = QtWidgets.QListWidget(self.ImageListPage)
         self.fileList.setObjectName("fileList")

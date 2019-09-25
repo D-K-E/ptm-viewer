@@ -6,7 +6,7 @@ from PySide2 import QtCore, QtGui, QtWidgets, QtOpenGL
 
 from PySide2.QtCore import QCoreApplication
 
-from shiboken2 import VoidPtr
+from PySide2.shiboken2 import VoidPtr
 
 import numpy as np
 import sys
@@ -80,6 +80,13 @@ class AppWindowFinal(AppWindowInit):
         self.rotAngle.valueChanged.connect(self.setAngle)
         self.shinSpin.valueChanged.connect(self.setShininess)
 
+        # viewer widget, opengl widgets with different shaders
+        self.availableGlWidgets = {
+            "Lambertian": PtmLambertianGLWidget,
+            "SingleNormalMap": PtmNormalMapGLWidget,
+            "": "",
+        }
+
     # Ptm related stuff
     def loadPtm(self):
         "load ptm file into gl widget"
@@ -88,22 +95,44 @@ class AppWindowFinal(AppWindowInit):
         ptmobj = self.ptmfiles[cindex]
         ptm = RGBPTM(ptmobj["path"])
         # vertices, indices = ptm.getVerticesAndSizeArr()
-        image = ptm.getImage()
-        nmaps = ptm.getNormalMaps()
-        imqt = ImageQt.ImageQt(image)
-        nmap = nmaps[0]
-        nmapqt = ImageQt.ImageQt(nmap)
-        # self.viewerWidget = PtmLambertianGLWidget(
-                # imqt
-        # )
-        self.viewerWidget = PtmNormalMapGLWidget(imqt, nmapqt)
-        # self.viewerWidget = RectangleGL()
+        glchoice = "SingleNormalMap"
+        #
+        self.runGlPipeline(glchoice, ptm)
         info = self.viewerWidget.getGLInfo()
         # info = self.viewerWidget.getGlInfo()
         self.statusbar.showMessage(info, 5000)
         # self.viewerWidget.update()
         print("gl initialized in app")
-        self.viewerWidget.show()
+        # self.viewerWidget.show()
+
+    def replaceViewerWidget(self, glwidget):
+        "replace viewer widget with the given instantiated glwidget"
+        self.viewerLayout.replaceWidget(self.viewerWidget, glwidget)
+        self.viewerWidget = glwidget
+
+    def runGlPipeline(self, glchoice: str, ptm):
+        "run gl pipeline using given gl choice"
+        if glchoice == "Lambertian":
+            self.runLambertianPipeLine(glchoice, ptm)
+        elif glchoice == "SingleNormalMap":
+            self.runSingleNormalMapPipeLine(glchoice, ptm)
+
+    def runLambertianPipeLine(self, glchoice: str, ptm):
+        "run lambertian pipeline"
+        image = ptm.getImage()
+        imqt = ImageQt.ImageQt(image)
+        glwidget = self.availableGlWidgets[glchoice](imqt)
+        self.replaceViewerWidget(glwidget)
+
+    def runSingleNormalMapPipeLine(self, glchoice: str, ptm):
+        "run single normal map pipeline"
+        image = ptm.getImage()
+        imqt = ImageQt.ImageQt(image)
+        nmaps = ptm.getNormalMaps()
+        nmap = nmaps[0]
+        nmapqt = ImageQt.ImageQt(nmap)
+        glwidget = self.availableGlWidgets[glchoice](imqt, nmapqt)
+        self.replaceViewerWidget(glwidget)
 
     def moveGLCamera(self, direction: str):
         self.viewerWidget.moveCamera(direction)
@@ -225,7 +254,10 @@ class AppWindowFinal(AppWindowInit):
         "Import ptm files from folder using file dialog"
         self.fileList.clear()
         fdir = QtWidgets.QFileDialog.getOpenFileNames(
-            self.centralwidget, "Select PTM files", "./main/assets/ptms", "PTMs (*.ptm)"
+            self.centralwidget,
+            "Select PTM files",
+            "./main/assets/ptms",
+            "PTMs (*.ptm)",
         )
         if fdir:
             for fname in fdir[0]:

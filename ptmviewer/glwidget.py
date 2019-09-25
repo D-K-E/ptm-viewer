@@ -37,6 +37,7 @@ import ctypes
 from ptmviewer.utils.camera import QtCamera
 from ptmviewer.utils.light import QtLightSource
 from ptmviewer.utils.shaders import shaders
+import pdb
 
 try:
     from OpenGL import GL as pygl
@@ -48,7 +49,9 @@ except ImportError:
         "PyOpenGL must be installed to run this example.",
         QtWidgets.QMessageBox.Close,
     )
-    messageBox.setDetailedText("Run:\npip install PyOpenGL PyOpenGL_accelerate")
+    messageBox.setDetailedText(
+        "Run:\npip install PyOpenGL PyOpenGL_accelerate"
+    )
     messageBox.exec_()
     sys.exit(1)
 
@@ -100,6 +103,7 @@ class AbstractPointLightPtmGLWidget(QOpenGLWidget):
             # "texture": QOpenGLTexture}
         ]
 
+        # fmt: off
         self.lampVertices = np.array(
             [  # first square for cube
                 -0.5,  # first corner
@@ -214,6 +218,7 @@ class AbstractPointLightPtmGLWidget(QOpenGLWidget):
             ],
             dtype=ctypes.c_float,
         )
+        # fmt: on
         self.rotVectorLamp = QVector3D(0.1, 0.2, 0.5)
         self.rotationAngle = 45.0
         #
@@ -347,7 +352,9 @@ class AbstractPointLightPtmGLWidget(QOpenGLWidget):
         texture.create()
         texture.bind(unit)
         texture.setData(img)
-        texture.setMinMagFilters(QOpenGLTexture.Nearest, QOpenGLTexture.Nearest)
+        texture.setMinMagFilters(
+            QOpenGLTexture.Nearest, QOpenGLTexture.Nearest
+        )
         texture.setWrapMode(QOpenGLTexture.DirectionS, QOpenGLTexture.Repeat)
         texture.setWrapMode(QOpenGLTexture.DirectionT, QOpenGLTexture.Repeat)
         return texture
@@ -494,7 +501,9 @@ class AbstractPointLightPtmGLWidget(QOpenGLWidget):
         # object: vbo, vao
         self.vbo.create()
         self.vbo.bind()
-        self.vbo.allocate(self.vertices.tobytes(), self.vertices.size * floatSize)
+        self.vbo.allocate(
+            self.vertices.tobytes(), self.vertices.size * floatSize
+        )
         #
         self.vao.create()
         self.vao.bind()
@@ -608,6 +617,7 @@ class PtmLambertianGLWidget(AbstractPointLightPtmGLWidget):
         lampModel = QMatrix4x4()
         lampModel.translate(self.lamp.position)
         lampModel.rotate(self.rotationAngle, self.rotVectorLamp)
+        lampModel.scale(0.1)
         self.lampProgram.setUniformValue("projection", projectionMatrix)
         self.lampProgram.setUniformValue("view", viewMatrix)
         self.lampProgram.setUniformValue("model", lampModel)
@@ -617,11 +627,14 @@ class PtmLambertianGLWidget(AbstractPointLightPtmGLWidget):
 class PtmNormalMapGLWidget(PtmLambertianGLWidget):
     "Opengl widget that displays ptm diffuse map and a normal map"
 
-    def __init__(self, ptmImage: QImage, 
-            normalMap: QImage, 
-            objectShaderName="quad",
-            lampShaderName="lamp",
-            parent=None):
+    def __init__(
+        self,
+        ptmImage: QImage,
+        normalMap: QImage,
+        objectShaderName="quad",
+        lampShaderName="lamp",
+        parent=None,
+    ):
         super().__init__(ptmImage, parent)
         self.objectShaderName = objectShaderName
         self.lampShaderName = lampShaderName
@@ -640,53 +653,54 @@ class PtmNormalMapGLWidget(PtmLambertianGLWidget):
             },
         ]
         self.coords = {
-                "pos": [
-                    QVector3D(-1.0,  1.0, 0.0),
-                    QVector3D(-1.0,  -1.0, 0.0),
-                    QVector3D(1.0,  -1.0, 0.0),
-                    QVector3D(1.0,  1.0, 0.0),
-                    ],
-                "uv": [
-                    QVector2D(0.0, 1.0),
-                    QVector2D(0.0, 0.0),
-                    QVector2D(1.0, 0.0),
-                    QVector2D(1.0, 1.0),
-                    ],
-                "n": QVector3D(0.0, 0.0, 1.0) 
+            "pos": {
+                "tl": QVector3D(-1.0, 1.0, 0.0),
+                "bl": QVector3D(-1.0, -1.0, 0.0),
+                "br": QVector3D(1.0, -1.0, 0.0),
+                "tr": QVector3D(1.0, 1.0, 0.0),
+            },
+            "uv": {
+                "tl": QVector2D(0.0, 1.0),
+                "bl": QVector2D(0.0, 0.0),
+                "br": QVector2D(1.0, 0.0),
+                "tr": QVector2D(1.0, 1.0),
+            },
+            "n": QVector3D(0.0, 0.0, 1.0),
         }
         self.vertices = None
         self.fromCoords2Vertices()
         # fmt: off
         # vertices = [
-                # first triangle
-                # self.coords["pos"][0].x(), self.coords["pos"][0].y(),
-                # self.coords["pos"][0].z(), self.coords["n"].x(),
-                # self.coords["n"].y(), self.coords["n"].z(), t1x, t1y, t1z,
-                # bit1x, bit1y, bit1z,
-                # self.coords["pos"][1].x(), self.coords["pos"][1].y(),
-                # self.coords["pos"][1].z(), self.coords["n"].x(),
-                # self.coords["n"].y(), self.coords["n"].z(), t1x, t1y, t1z,
-                # bit1x, bit1y, bit1z,
-                # self.coords["pos"][2].x(), self.coords["pos"][2].y(),
-                # self.coords["pos"][2].z(), self.coords["n"].x(),
-                # self.coords["n"].y(), self.coords["n"].z(), t1x, t1y, t1z,
-                # bit1x, bit1y, bit1z,
+        # first triangle
+        # self.coords["pos"][0].x(), self.coords["pos"][0].y(),
+        # self.coords["pos"][0].z(), self.coords["n"].x(),
+        # self.coords["n"].y(), self.coords["n"].z(), t1x, t1y, t1z,
+        # bit1x, bit1y, bit1z,
+        # self.coords["pos"][1].x(), self.coords["pos"][1].y(),
+        # self.coords["pos"][1].z(), self.coords["n"].x(),
+        # self.coords["n"].y(), self.coords["n"].z(), t1x, t1y, t1z,
+        # bit1x, bit1y, bit1z,
+        # self.coords["pos"][2].x(), self.coords["pos"][2].y(),
+        # self.coords["pos"][2].z(), self.coords["n"].x(),
+        # self.coords["n"].y(), self.coords["n"].z(), t1x, t1y, t1z,
+        # bit1x, bit1y, bit1z,
 
-                # second triangle
-                # self.coords["pos"][0].x(), self.coords["pos"][0].y(),
-                # self.coords["pos"][0].z(), self.coords["n"].x(),
-                # self.coords["n"].y(), self.coords["n"].z(), t2x, t2y, t2z,
-                # bit2x, bit2y, bit2z,
-                # self.coords["pos"][2].x(), self.coords["pos"][2].y(),
-                # self.coords["pos"][2].z(), self.coords["n"].x(),
-                # self.coords["n"].y(), self.coords["n"].z(), t2x, t2y, t2z,
-                # bit2x, bit2y, bit2z,
-                # self.coords["pos"][3].x(), self.coords["pos"][3].y(),
-                # self.coords["pos"][3].z(), self.coords["n"].x(),
-                # self.coords["n"].y(), self.coords["n"].z(), t2x, t2y, t2z,
-                # bit2x, bit2y, bit2z
+        # second triangle
+        # self.coords["pos"][0].x(), self.coords["pos"][0].y(),
+        # self.coords["pos"][0].z(), self.coords["n"].x(),
+        # self.coords["n"].y(), self.coords["n"].z(), t2x, t2y, t2z,
+        # bit2x, bit2y, bit2z,
+        # self.coords["pos"][2].x(), self.coords["pos"][2].y(),
+        # self.coords["pos"][2].z(), self.coords["n"].x(),
+        # self.coords["n"].y(), self.coords["n"].z(), t2x, t2y, t2z,
+        # bit2x, bit2y, bit2z,
+        # self.coords["pos"][3].x(), self.coords["pos"][3].y(),
+        # self.coords["pos"][3].z(), self.coords["n"].x(),
+        # self.coords["n"].y(), self.coords["n"].z(), t2x, t2y, t2z,
+        # bit2x, bit2y, bit2z
         # ]
         # fmt: on
+        pdb.set_trace()
 
     def computeTangentBiTangent(
         self,
@@ -722,8 +736,7 @@ class PtmNormalMapGLWidget(PtmLambertianGLWidget):
         #
         return tangent, bitangent
 
-    def makeCoordList(self, tangent1, 
-            bitangent1, tangent2, bitangent2):
+    def makeCoordList(self, tangent1, bitangent1, tangent2, bitangent2):
         "add coords to vertlist"
         t1x = tangent1.x()
         t1y = tangent1.y()
@@ -738,50 +751,111 @@ class PtmNormalMapGLWidget(PtmLambertianGLWidget):
         bit2y = bitangent2.y()
         bit2z = bitangent2.z()
         coordList = [
-                # first triangle
-                self.coords["pos"][0].x(), self.coords["pos"][0].y(),
-                self.coords["pos"][0].z(), self.coords["n"].x(),
-                self.coords["n"].y(), self.coords["n"].z(), t1x, t1y, t1z,
-                bit1x, bit1y, bit1z,
-                self.coords["pos"][1].x(), self.coords["pos"][1].y(),
-                self.coords["pos"][1].z(), self.coords["n"].x(),
-                self.coords["n"].y(), self.coords["n"].z(), t1x, t1y, t1z,
-                bit1x, bit1y, bit1z,
-                self.coords["pos"][2].x(), self.coords["pos"][2].y(),
-                self.coords["pos"][2].z(), self.coords["n"].x(),
-                self.coords["n"].y(), self.coords["n"].z(), t1x, t1y, t1z,
-                bit1x, bit1y, bit1z,
-
-                # second triangle
-                self.coords["pos"][0].x(), self.coords["pos"][0].y(),
-                self.coords["pos"][0].z(), self.coords["n"].x(),
-                self.coords["n"].y(), self.coords["n"].z(), t2x, t2y, t2z,
-                bit2x, bit2y, bit2z,
-                self.coords["pos"][2].x(), self.coords["pos"][2].y(),
-                self.coords["pos"][2].z(), self.coords["n"].x(),
-                self.coords["n"].y(), self.coords["n"].z(), t2x, t2y, t2z,
-                bit2x, bit2y, bit2z,
-                self.coords["pos"][3].x(), self.coords["pos"][3].y(),
-                self.coords["pos"][3].z(), self.coords["n"].x(),
-                self.coords["n"].y(), self.coords["n"].z(), t2x, t2y, t2z,
-                bit2x, bit2y, bit2z
+            # first triangle
+            self.coords["pos"]["tl"].x(),
+            self.coords["pos"]["tl"].y(),
+            self.coords["pos"]["tl"].z(),
+            self.coords["n"].x(),
+            self.coords["n"].y(),
+            self.coords["n"].z(),
+            self.coords["uv"]["tl"].x(),
+            self.coords["uv"]["tl"].y(),
+            t1x,
+            t1y,
+            t1z,
+            bit1x,
+            bit1y,
+            bit1z,
+            self.coords["pos"]["bl"].x(),
+            self.coords["pos"]["bl"].y(),
+            self.coords["pos"]["bl"].z(),
+            self.coords["n"].x(),
+            self.coords["n"].y(),
+            self.coords["n"].z(),
+            self.coords["uv"]["bl"].x(),
+            self.coords["uv"]["bl"].y(),
+            t1x,
+            t1y,
+            t1z,
+            bit1x,
+            bit1y,
+            bit1z,
+            self.coords["pos"]["br"].x(),
+            self.coords["pos"]["br"].y(),
+            self.coords["pos"]["br"].z(),
+            self.coords["n"].x(),
+            self.coords["n"].y(),
+            self.coords["n"].z(),
+            self.coords["uv"]["br"].x(),
+            self.coords["uv"]["br"].y(),
+            t1x,
+            t1y,
+            t1z,
+            bit1x,
+            bit1y,
+            bit1z,
+            # second triangle
+            self.coords["pos"]["tl"].x(),
+            self.coords["pos"]["tl"].y(),
+            self.coords["pos"]["tl"].z(),
+            self.coords["n"].x(),
+            self.coords["n"].y(),
+            self.coords["n"].z(),
+            self.coords["uv"]["tl"].x(),
+            self.coords["uv"]["tl"].y(),
+            t2x,
+            t2y,
+            t2z,
+            bit2x,
+            bit2y,
+            bit2z,
+            self.coords["pos"]["tr"].x(),
+            self.coords["pos"]["tr"].y(),
+            self.coords["pos"]["tr"].z(),
+            self.coords["n"].x(),
+            self.coords["n"].y(),
+            self.coords["n"].z(),
+            self.coords["uv"]["tr"].x(),
+            self.coords["uv"]["tr"].y(),
+            t2x,
+            t2y,
+            t2z,
+            bit2x,
+            bit2y,
+            bit2z,
+            self.coords["pos"]["br"].x(),
+            self.coords["pos"]["br"].y(),
+            self.coords["pos"]["br"].z(),
+            self.coords["n"].x(),
+            self.coords["n"].y(),
+            self.coords["n"].z(),
+            self.coords["uv"]["br"].x(),
+            self.coords["uv"]["br"].y(),
+            t2x,
+            t2y,
+            t2z,
+            bit2x,
+            bit2y,
+            bit2z,
         ]
         return coordList
 
     def fromCoords2Vertices(self):
         "transform coordinates to vertices"
-        edge1 = self.coords["pos"][1] - self.coords["pos"][0]
-        edge2 = self.coords["pos"][2] - self.coords["pos"][0]
-        delta1 = self.coords["uv"][1] - self.coords["uv"][0]
-        delta2 = self.coords["uv"][2] - self.coords["uv"][0]
-        tangent1, bitangent1 = self.computeTangentBiTangent(edge1, edge2,
-                delta1, delta2)
-        edge1 = self.coords["pos"][2] - self.coords["pos"][0]
-        edge2 = self.coords["pos"][3] - self.coords["pos"][0]
-        delta1 = self.coords["uv"][2] - self.coords["uv"][0]
-        delta2 = self.coords["uv"][3] - self.coords["uv"][0]
-        tangent2, bitangent2 = self.computeTangentBiTangent(edge1, edge2,
-                delta1, delta2)
+        edge1 = self.coords["pos"]["bl"] - self.coords["pos"]["tl"]
+        edge2 = self.coords["pos"]["br"] - self.coords["pos"]["tl"]
+        delta1 = self.coords["uv"]["bl"] - self.coords["uv"]["tl"]
+        delta2 = self.coords["uv"]["br"] - self.coords["uv"]["tl"]
+        tangent1, bitangent1 = self.computeTangentBiTangent(
+            edge1, edge2, delta1, delta2
+        )
+        edge1 = self.coords["pos"]["br"] - self.coords["pos"]["tl"]
+        edge2 = self.coords["pos"]["tr"] - self.coords["pos"]["tl"]
+        delta1 = self.coords["uv"]["br"] - self.coords["uv"]["tl"]
+        delta2 = self.coords["uv"]["tr"] - self.coords["uv"]["tl"]
+        tangent2, bitangent2 = self.computeTangentBiTangent(
+            edge1, edge2, delta1, delta2
+        )
         clist = self.makeCoordList(tangent1, bitangent1, tangent2, bitangent2)
         self.vertices = np.array(clist, dtype=ctypes.c_float)
 
@@ -802,4 +876,3 @@ class PtmNormalMapGLWidget(PtmLambertianGLWidget):
         self.program.setUniformValue("viewPos", self.camera.position)
         self.program.setUniformValue("ambientCoeff", self.ambientCoeff)
         self.program.setUniformValue("shininess", self.shininess)
-
