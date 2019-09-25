@@ -25,6 +25,23 @@ See ![Docs](docs/install.rst "Installation")
 - `cd ptmviewer`
 - `python qtapp.py`
 
+## Roadmap
+
+- Handle more advanced shading.
+
+  - PBR if possible
+
+- Change light controller
+
+  - Give more control on illumination parameters
+
+
+## Known Issues
+
+- Camera pierces through the ptm surface
+- Light also passes through ptm surface.
+
+
 ## Remarks
 
 The rendering should work with no hassle since its all done in OpenGL. Just
