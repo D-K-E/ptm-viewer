@@ -85,8 +85,13 @@ class AppWindowFinal(AppWindowInit):
         self.availableGlWidgets = {
             "Lambertian": PtmLambertianGLWidget,
             "SingleNormalMap": PtmNormalMapGLWidget,
-            "": "",
+            "PerChannelNormalMap": PtmPerChannelNormalMapGLWidget,
         }
+        wnames = [k for k in self.availableGlWidgets.keys()]
+        self.shaderCombo.addItems(wnames)
+        self.shaderCombo.setEditable(False)
+        self.shaderCombo.setCurrentText(wnames[0])
+        # self.shaderCombo.currentTextChanged.connect(self.loadPtm)
 
     # Ptm related stuff
     def loadPtm(self):
@@ -96,7 +101,7 @@ class AppWindowFinal(AppWindowInit):
         ptmobj = self.ptmfiles[cindex]
         ptm = RGBPTM(ptmobj["path"])
         # vertices, indices = ptm.getVerticesAndSizeArr()
-        glchoice = "SingleNormalMap"
+        glchoice = self.shaderCombo.currentText()
         #
         self.runGlPipeline(glchoice, ptm)
         info = self.viewerWidget.getGLInfo()
@@ -118,6 +123,8 @@ class AppWindowFinal(AppWindowInit):
             self.runLambertianPipeLine(glchoice, ptm)
         elif glchoice == "SingleNormalMap":
             self.runSingleNormalMapPipeLine(glchoice, ptm)
+        elif glchoice == "PerChannelNormalMap":
+            self.runPerChannelNormalMapPipeLine(glchoice, ptm)
 
     def runLambertianPipeLine(self, glchoice: str, ptm):
         "run lambertian pipeline"
@@ -134,6 +141,15 @@ class AppWindowFinal(AppWindowInit):
         nmap = nmaps[0]
         nmapqt = ImageQt.ImageQt(nmap)
         glwidget = self.availableGlWidgets[glchoice](imqt, nmapqt)
+        self.replaceViewerWidget(glwidget)
+
+    def runPerChannelNormalMapPipeLine(self, glchoice: str, ptm):
+        "run per channel normal map pipeline"
+        image = ptm.getImage()
+        imqt = ImageQt.ImageQt(image)
+        nmaps = ptm.getNormalMaps()
+        nmaps = [ImageQt.ImageQt(nmap) for nmap in nmaps]
+        glwidget = self.availableGlWidgets[glchoice](imqt, nmaps)
         self.replaceViewerWidget(glwidget)
 
     def moveGLCamera(self, direction: str):
@@ -258,9 +274,8 @@ class AppWindowFinal(AppWindowInit):
         fdir = QtWidgets.QFileDialog.getOpenFileNames(
             self.centralwidget,
             "Select PTM files",
-            "./main/assets/ptms",
+            "ptmviewer/assets/ptms",
             "PTMs (*.ptm)",
-            self.centralwidget, "Select PTM files", "./main/assets/ptms", "PTMs (*.ptm)"
         )
         if fdir:
             for fname in fdir[0]:

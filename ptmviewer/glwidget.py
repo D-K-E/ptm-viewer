@@ -38,6 +38,7 @@ from ptmviewer.utils.camera import QtCamera
 from ptmviewer.utils.light import QtLightSource
 from ptmviewer.utils.shaders import shaders
 import pdb
+from typing import Tuple
 
 try:
     from OpenGL import GL as pygl
@@ -549,7 +550,6 @@ class AbstractPointLightPtmGLWidget(QOpenGLWidget):
         self.setLampShaderUniforms_proc()
         funcs.glDrawArrays(pygl.GL_TRIANGLES, 0, 36)
 
-
 class PtmLambertianGLWidget(AbstractPointLightPtmGLWidget):
     "OpenGL widget that displays ptm diffuse map"
 
@@ -705,7 +705,6 @@ class PtmNormalMapGLWidget(PtmLambertianGLWidget):
         # bit2x, bit2y, bit2z
         # ]
         # fmt: on
-        pdb.set_trace()
 
     def computeTangentBiTangent(
         self,
@@ -881,6 +880,7 @@ class PtmNormalMapGLWidget(PtmLambertianGLWidget):
         self.program.setUniformValue("viewPos", self.camera.position)
         self.program.setUniformValue("ambientCoeff", self.ambientCoeff)
         self.program.setUniformValue("shininess", self.shininess)
+        self.program.setUniformValue("lightColor", self.lamp.color)
 
 class PtmPerChannelNormalMapGLWidget(PtmNormalMapGLWidget):
     "implement per channel normal map shader with opengl widget"
@@ -905,3 +905,27 @@ class PtmPerChannelNormalMapGLWidget(PtmNormalMapGLWidget):
         #
         self.vertices = None
         self.fromCoords2Vertices()
+
+    def setObjectShaderUniforms_proc(self):
+        "set object shader uniforms"
+        projectionMatrix = QMatrix4x4()
+        projectionMatrix.perspective(
+            self.camera.zoom, self.width() / self.height(), 0.2, 100.0
+        )
+        viewMatrix = self.camera.getViewMatrix()
+        model = QMatrix4x4()
+        color = self.lamp.color
+        pos = self.lamp.position
+        self.program.setUniformValue("projection", projectionMatrix)
+        self.program.setUniformValue("view", viewMatrix)
+        self.program.setUniformValue("model", model)
+        self.program.setUniformValue("lightPos", self.lamp.position)
+        self.program.setUniformValue("lightDirection", self.lamp.direction)
+        self.program.setUniformValue("lightColor", self.lamp.color)
+        self.program.setUniformValue("attc1", self.lamp.attenConst)
+        self.program.setUniformValue("attc2", self.lamp.attenLinear)
+        self.program.setUniformValue("attc3", self.lamp.attenQuad)
+        self.program.setUniformValue("cutOff", self.lamp.cutOff)
+        self.program.setUniformValue("viewPos", self.camera.position)
+        self.program.setUniformValue("ambientCoeff", self.ambientCoeff)
+        self.program.setUniformValue("shininess", self.shininess)

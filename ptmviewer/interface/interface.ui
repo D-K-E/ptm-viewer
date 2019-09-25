@@ -34,15 +34,15 @@
       <item>
        <widget class="QToolBox" name="toolBox">
         <property name="currentIndex">
-         <number>1</number>
+         <number>0</number>
         </property>
         <widget class="QWidget" name="ViewerPage">
          <property name="geometry">
           <rect>
            <x>0</x>
            <y>0</y>
-           <width>367</width>
-           <height>624</height>
+           <width>472</width>
+           <height>607</height>
           </rect>
          </property>
          <attribute name="label">
@@ -76,13 +76,13 @@
                     <item>
                      <widget class="QDoubleSpinBox" name="lightRed">
                       <property name="maximum">
-                       <double>255.000000000000000</double>
+                       <double>1.000000000000000</double>
                       </property>
                       <property name="singleStep">
-                       <double>0.100000000000000</double>
+                       <double>0.010000000000000</double>
                       </property>
                       <property name="value">
-                       <double>255.000000000000000</double>
+                       <double>1.000000000000000</double>
                       </property>
                      </widget>
                     </item>
@@ -100,13 +100,13 @@
                     <item>
                      <widget class="QDoubleSpinBox" name="lightGreen">
                       <property name="maximum">
-                       <double>255.000000000000000</double>
+                       <double>1.000000000000000</double>
                       </property>
                       <property name="singleStep">
-                       <double>0.100000000000000</double>
+                       <double>0.010000000000000</double>
                       </property>
                       <property name="value">
-                       <double>255.000000000000000</double>
+                       <double>1.000000000000000</double>
                       </property>
                      </widget>
                     </item>
@@ -124,13 +124,13 @@
                     <item>
                      <widget class="QDoubleSpinBox" name="lightBlue">
                       <property name="maximum">
-                       <double>255.000000000000000</double>
+                       <double>1.000000000000000</double>
                       </property>
                       <property name="singleStep">
-                       <double>0.100000000000000</double>
+                       <double>0.010000000000000</double>
                       </property>
                       <property name="value">
-                       <double>255.000000000000000</double>
+                       <double>1.000000000000000</double>
                       </property>
                      </widget>
                     </item>
@@ -142,6 +142,24 @@
               </item>
               <item>
                <layout class="QHBoxLayout" name="horizontalLayout_11">
+                <item>
+                 <layout class="QVBoxLayout" name="verticalLayout_2">
+                  <item>
+                   <widget class="QLabel" name="label_13">
+                    <property name="text">
+                     <string>Shader</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QComboBox" name="shaderCombo">
+                    <property name="currentText">
+                     <string/>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </item>
                 <item>
                  <layout class="QVBoxLayout" name="verticalLayout_23">
                   <item>
@@ -264,24 +282,6 @@
                   </item>
                   <item>
                    <widget class="QSlider" name="rotCamY">
-                    <property name="orientation">
-                     <enum>Qt::Horizontal</enum>
-                    </property>
-                   </widget>
-                  </item>
-                 </layout>
-                </item>
-                <item>
-                 <layout class="QHBoxLayout" name="horizontalLayout_9">
-                  <item>
-                   <widget class="QLabel" name="label_13">
-                    <property name="text">
-                     <string>z</string>
-                    </property>
-                   </widget>
-                  </item>
-                  <item>
-                   <widget class="QSlider" name="rotCamZ">
                     <property name="orientation">
                      <enum>Qt::Horizontal</enum>
                     </property>

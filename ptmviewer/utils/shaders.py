@@ -256,68 +256,123 @@ in vec3 TangentFragPos;
 out vec4 FragColor;
 
 uniform sampler2D diffuseMap; // object colors per fragment
-uniform sampler2D normalMapR; // normals per vertex
-uniform sampler2D normalMapG; // normals per vertex
-uniform sampler2D normalMapB; // normals per vertex
+uniform sampler2D normalMap1; // normals per vertex
+uniform sampler2D normalMap2; // normals per vertex
+uniform sampler2D normalMap3; // normals per vertex
 
 uniform float ambientCoeff;
 uniform float shininess;
+uniform float attc1;
+uniform float attc2;
+uniform float attc3;
+uniform float cutOff;
 
 uniform vec3 lightPos;
+uniform vec3 lightDirection;
 uniform vec3 lightColor;
 uniform vec3 viewPos;
+
+float computeDiffColorPerChannel(vec3 normal, vec3 lightDir, float intensity);
+float computeSpecColorPerChannel(vec3 normal, vec3 dirVec, 
+                                 float shininess, float intensity);
+vec3 computeSpecColor(vec3 normal1, vec3 normal2, vec3 normal3, vec3 dirVec,
+                      float shininess, vec3 color);
+vec3 computeDiffColor(vec3 normal1, vec3 normal2, vec3 normal3, vec3 lightDir,
+                      vec3 color);
+float computeAttenuation(float attC1, float attC2, float attC3, float dist);
+
 
 void main()
 {
     // obtain normal map from texture [0,1]
-    vec3 normalr = texture(normalMapR, TexCoords).rgb;
-    vec3 normalg = texture(normalMapG, TexCoords).rgb;
-    vec3 normalb = texture(normalMapB, TexCoords).rgb;
-
-    // transform vector to range [-1,1]
-    normalr = normalize((normalr * 2.0) - 1.0);
-    normalg = normalize((normalg * 2.0) - 1.0);
-    normalb = normalize((normalb * 2.0) - 1.0);
-
-    // get diffuse color
+    vec3 normalr = texture(normalMap1, TexCoords).rgb;
+    vec3 normalg = texture(normalMap2, TexCoords).rgb;
+    vec3 normalb = texture(normalMap3, TexCoords).rgb;
+    
+    // get diffuse color for object
     vec3 color = texture(diffuseMap, TexCoords).rgb;
 
+    // attenuation
+    float distanceLightFrag = length(lightPos - FragPos);
+    float att = computeAttenuation(attc1, attc2, attc3, distanceLightFrag);
+
     // ambient color for object
-    vec3 ambientColor = color * ambientCoeff;
+    vec3 ambientColor = color * ambientCoeff * att;
 
-    // costheta
+
+    // simple light direction
     vec3 lightDir = normalize(TangentLightPos - TangentFragPos);
-    float costhetaR = dot(lightDir, normalr);
-    float costhetaG = dot(lightDir, normalg);
-    float costhetaB = dot(lightDir, normalb);
-    costhetaR = max(costhetaR, 0.0);
-    costhetaG = max(costhetaG, 0.0);
-    costhetaB = max(costhetaB, 0.0);
+
+    // spotlight cone theta
+    float theta = dot(lightDir, lightDirection);
+    if (theta > cutOff)
+    {
+        // costheta
+        vec3 diffuseColor = computeDiffColor(normalr, normalg, normalb, lightDir,
+                                             color) * att;
+        // specular
+        vec3 viewDir = normalize(TangentViewPos - TangentFragPos);
+        // vec3 reflectDir = reflect(-lightDir, normal);
+        vec3 halfway = normalize(lightDir + viewDir);
+        vec3 specularColor = computeSpecColor(normalr, normalg, normalb, halfway,
+                                              shininess, lightColor) * att;
+        // final fragment color
+        FragColor = vec4(ambientColor + diffuseColor + specularColor, 1.0);
+    }else{
+    FragColor = vec4(ambientColor, 1.0);
+    }
+}
+
+float computeAttenuation(float attC1, float attC2, float attC3, float dist)
+{
+    /* f_att = min(\frac{1}{c_1 + c_2{\times}d_L + c_3{\times}d^2_{L}} , 1)
+    */
+    float distSqr = dist * dist;
+    float att1 = dist * attC2;
+    float att2 = distSqr * attC3;
+    float result = attC1 + att2 + att1;
+    result = 1 / result;
+    return min(result, 1);
+}
+
+float computeDiffColorPerChannel(vec3 normal, vec3 lightDir, float intensity)
+{
+    // transform vector to range [-1,1]
+    normal = normalize((normal * 2.0) - 1.0);
+    float costheta = dot(lightDir, normal);
+    costheta = max(costheta, 0.0);
+    return costheta * intensity;
+}
+vec3 computeDiffColor(vec3 normal1, vec3 normal2, vec3 normal3, vec3 lightDir,
+                      vec3 color)
+{
     vec3 diffuseColor = vec3(1.0);
-    diffuseColor.x = color.x * costhetaR;
-    diffuseColor.y = color.y * costhetaG;
-    diffuseColor.z = color.z * costhetaB;
+    diffuseColor.x = computeDiffColorPerChannel(normal1, lightDir, color.x);
+    diffuseColor.y = computeDiffColorPerChannel(normal2, lightDir, color.y);
+    diffuseColor.z = computeDiffColorPerChannel(normal3, lightDir, color.z);
+    return diffuseColor;
+}
 
-    // specular
-    vec3 viewDir = normalize(TangentViewPos - TangentFragPos);
-    // vec3 reflectDir = reflect(-lightDir, normal);
-    vec3 halfway = normalize(lightDir + viewDir);
-    float specAngleR = dot(normalr, halfway);
-    float specAngleG = dot(normalg, halfway);
-    float specAngleB = dot(normalb, halfway);
-    specAngleR = max(specAngleR, 0.0);
-    specAngleG = max(specAngleG, 0.0);
-    specAngleB = max(specAngleB, 0.0);
-    specAngleR = pow(specAngleR, shininess);
-    specAngleG = pow(specAngleG, shininess);
-    specAngleB = pow(specAngleB, shininess);
+float computeSpecColorPerChannel(vec3 normal, vec3 dirVec, 
+                                 float shininess, float intensity)
+{
+    normal = normalize((normal * 2.0) - 1.0);
+    float specAngle = dot(normal, dirVec);
+    specAngle = max(specAngle, 0.0);
+    specAngle = pow(specAngle, shininess);
+    return specAngle * intensity;
+}
+vec3 computeSpecColor(vec3 normal1, vec3 normal2, vec3 normal3, vec3 dirVec,
+                      float shininess, vec3 color)
+{
     vec3 specularColor = vec3(1.0);
-    specularColor.x = lightColor.x * specAngleR;
-    specularColor.y = lightColor.y * specAngleG;
-    specularColor.z = lightColor.z * specAngleB;
-
-    // final fragment color
-    FragColor = vec4(ambientColor + diffuseColor + specularColor, 1.0);
+    specularColor.x = computeSpecColorPerChannel(normal1, dirVec,
+                                                 shininess, lightColor.x);
+    specularColor.y = computeSpecColorPerChannel(normal2, dirVec,
+                                                 shininess, lightColor.y);
+    specularColor.z = computeSpecColorPerChannel(normal3, dirVec,
+                                                 shininess, lightColor.z);
+    return specularColor;
 }
 """
 quadFshaderPerChannelTest = """
