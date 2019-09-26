@@ -2,12 +2,14 @@
 # license: see, LICENSE
 # No warranties, see LICENSE
 
-from ptmviewer.ptmparser import PTMFileParse
-
-import numpy as np
-from PIL import Image
-from ctypes import c_float, c_uint
 import pdb
+import numpy as np
+
+from ptmviewer.ptmparser import PTMFileParse
+from ptmviewer.utils.utils import getInterpolationTable
+
+from ctypes import c_float, c_uint
+from PIL import Image
 
 
 class RGBPTM(PTMFileParse):
@@ -153,7 +155,7 @@ class RGBPTM(PTMFileParse):
         self.setImage()
         return Image.fromarray(self.image)
 
-    def getVerticesAndSizeArr(self):
+    def getNbVertices(self):
         """
         obtain vertices from coefficients suitable for opengl drawing
 
@@ -169,24 +171,30 @@ class RGBPTM(PTMFileParse):
         Due to our specification of the memory layout, the first three
         components of the VAO has to be position in 3d coordinates
         """
-        vertices = np.empty((self.imheight, self.imwidth, 21), dtype=c_float)
-        indices = np.array(
-            [i for i in range(self.imheight * self.imwidth)], dtype=c_uint
-        )
-        indices = np.array([i for i in range(self.imheight * self.imwidth)],
-                dtype=c_uint)
-        rcoeff = self.imcoeffs[0, :, :]
-        rcoeff = rcoeff.reshape((self.imheight, self.imwidth, 6))
-        gcoeff = self.imcoeffs[1, :, :]
-        gcoeff = gcoeff.reshape((self.imheight, self.imwidth, 6))
-        bcoeff = self.imcoeffs[2, :, :]
-        bcoeff = bcoeff.reshape((self.imheight, self.imwidth, 6))
-        for i in range(self.imheight):
-            for k in range(self.imwidth):
-                vertices[i, k, 0:2] = [i, k]  # x, y coordinates
-                vertices[i, k, 2] = 1.0  # z coordinate
-                vertices[i, k, 3:9] = rcoeff[i, k, :]
-                vertices[i, k, 9:15] = gcoeff[i, k, :]
-                vertices[i, k, 15:] = bcoeff[i, k, :]
+        rowsize = self.imwidth * self.imheight
+        warr = np.array(range(self.imwidth), dtype=c_float)
+        wnorm = np.interp(warr, (warr.min(), warr.max()), (-1, 1))
+        harr = np.array(range(self.imheight), dtype=c_float)
+        hnorm = np.interp(harr, (harr.min(), harr.max()), (-1, 1))
         #
-        return vertices, indices
+        vertices = np.empty((self.imheight, self.imwidth, 21), dtype=c_float)
+        # add width arr to vertices
+        vertices = vertices.reshape(self.imwidth, 21 * self.imheight, 1)
+        vertices[:, 0, 0] = wnorm
+        vertices = vertices.reshape(self.imheight, 21 * self.imwidth, 1)
+        vertices[:, 1, 0] = hnorm
+        vertices = vertices.reshape(rowsize, 21, 1)
+        vertices[:, 2, 0] = 1.0
+        vertices = vertices.reshape(rowsize, 21)
+        indices = np.array(
+            [i for i in range(rowsize)], dtype=c_uint
+        )
+
+        rcoeff = self.imcoeffs[0, :, :]
+        gcoeff = self.imcoeffs[1, :, :]
+        bcoeff = self.imcoeffs[2, :, :]
+        vertices[:, 3:9] = rcoeff
+        vertices[:, 9:15] = gcoeff
+        vertices[:, 15:] = bcoeff
+        vnb = vertices.shape[0]
+        return vertices.reshape(-1), vnb

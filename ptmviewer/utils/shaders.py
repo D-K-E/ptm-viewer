@@ -273,7 +273,7 @@ uniform vec3 lightColor;
 uniform vec3 viewPos;
 
 float computeDiffColorPerChannel(vec3 normal, vec3 lightDir, float intensity);
-float computeSpecColorPerChannel(vec3 normal, vec3 dirVec, 
+float computeSpecColorPerChannel(vec3 normal, vec3 dirVec,
                                  float shininess, float intensity);
 vec3 computeSpecColor(vec3 normal1, vec3 normal2, vec3 normal3, vec3 dirVec,
                       float shininess, vec3 color);
@@ -293,11 +293,11 @@ void main()
     vec3 color = texture(diffuseMap, TexCoords).rgb;
 
     // attenuation
-    float distanceLightFrag = length(lightPos - FragPos);
+    float distanceLightFrag = length(TangentLightPos - TangentFragPos);
     float att = computeAttenuation(attc1, attc2, attc3, distanceLightFrag);
 
     // ambient color for object
-    vec3 ambientColor = color * ambientCoeff * att;
+    vec3 ambientColor = color * ambientCoeff;
 
 
     // simple light direction
@@ -305,22 +305,17 @@ void main()
 
     // spotlight cone theta
     float theta = dot(lightDir, lightDirection);
-    if (theta > cutOff)
-    {
-        // costheta
-        vec3 diffuseColor = computeDiffColor(normalr, normalg, normalb, lightDir,
-                                             color) * att;
-        // specular
-        vec3 viewDir = normalize(TangentViewPos - TangentFragPos);
-        // vec3 reflectDir = reflect(-lightDir, normal);
-        vec3 halfway = normalize(lightDir + viewDir);
-        vec3 specularColor = computeSpecColor(normalr, normalg, normalb, halfway,
-                                              shininess, lightColor) * att;
-        // final fragment color
-        FragColor = vec4(ambientColor + diffuseColor + specularColor, 1.0);
-    }else{
-    FragColor = vec4(ambientColor, 1.0);
-    }
+    // costheta
+    vec3 diffuseColor = computeDiffColor(normalr, normalg, normalb, lightDir,
+                                         color) * att;
+    // specular
+    vec3 viewDir = normalize(TangentViewPos - TangentFragPos);
+    // vec3 reflectDir = reflect(-lightDir, normal);
+    vec3 halfway = normalize(lightDir + viewDir);
+    vec3 specularColor = computeSpecColor(normalr, normalg, normalb, halfway,
+                                          shininess, lightColor) * att;
+    // final fragment color
+    FragColor = vec4(ambientColor + diffuseColor + specularColor, 1.0);
 }
 
 float computeAttenuation(float attC1, float attC2, float attC3, float dist)
@@ -332,7 +327,7 @@ float computeAttenuation(float attC1, float attC2, float attC3, float dist)
     float att2 = distSqr * attC3;
     float result = attC1 + att2 + att1;
     result = 1 / result;
-    return min(result, 1);
+    return min(result, 1.0);
 }
 
 float computeDiffColorPerChannel(vec3 normal, vec3 lightDir, float intensity)
@@ -375,64 +370,6 @@ vec3 computeSpecColor(vec3 normal1, vec3 normal2, vec3 normal3, vec3 dirVec,
     return specularColor;
 }
 """
-quadFshaderPerChannelTest = """
-#version 330 core
-in vec3 FragPos;
-in vec2 TexCoords;
-in vec3 TangentLightPos;
-in vec3 TangentViewPos;
-in vec3 TangentFragPos;
-
-out vec4 FragColor;
-
-uniform sampler2D diffuseMap; // object colors per fragment
-uniform sampler2D normalMapR; // normals per vertex
-uniform sampler2D normalMapG; // normals per vertex
-uniform sampler2D normalMapB; // normals per vertex
-
-uniform float ambientCoeff;
-uniform float shininess;
-
-uniform vec3 lightPos;
-uniform vec3 lightColor;
-uniform vec3 viewPos;
-
-void main()
-{
-    // obtain normal map from texture [0,1]
-    vec3 normalr = texture(normalMapR, TexCoords).rgb;
-
-    // transform vector to range [-1,1]
-    normalr = normalize((normalr * 2.0) - 1.0);
-
-    // get diffuse color
-    vec3 color = texture(diffuseMap, TexCoords).rgb;
-
-    // ambient color for object
-    vec3 ambientColor = color * ambientCoeff;
-
-    // costheta
-    vec3 lightDir = normalize(TangentLightPos - TangentFragPos);
-    float costhetaR = dot(lightDir, normalr);
-    costhetaR = max(costhetaR, 0.0);
-    vec3 diffuseColor = vec3(1.0);
-    diffuseColor = color * costhetaR;
-
-    // specular
-    vec3 viewDir = normalize(TangentViewPos - TangentFragPos);
-    // vec3 reflectDir = reflect(-lightDir, normal);
-    vec3 halfway = normalize(lightDir + viewDir);
-    float specAngleR = dot(normalr, halfway);
-    specAngleR = max(specAngleR, 0.0);
-    specAngleR = pow(specAngleR, shininess);
-    vec3 specularColor = vec3(1.0);
-    specularColor = lightColor * specAngleR;
-
-    // final fragment color
-    FragColor = vec4(ambientColor + diffuseColor + specularColor, 1.0);
-}
-"""
-
 
 lampVshader = """
 #version 330 core
@@ -464,81 +401,146 @@ rgbptmVshader = """
 #version 330 core
 layout (location = 0) in vec3 aPos;
 
-layout (location = 1) in float acoeff1r;
-layout (location = 2) in float acoeff2r;
-layout (location = 3) in float acoeff3r;
-layout (location = 4) in float acoeff4r;
-layout (location = 5) in float acoeff5r;
-layout (location = 6) in float acoeff6r;
+layout (location = 1) in vec3 acoeff13r;
+layout (location = 2) in vec3 acoeff46r;
 
-layout (location = 7) in float acoeff1g;
-layout (location = 8) in float acoeff2g;
-layout (location = 9) in float acoeff3g;
-layout (location = 10) in float acoeff4g;
-layout (location = 11) in float acoeff5g;
-layout (location = 12) in float acoeff6g;
+layout (location = 3) in vec3 acoeff13g;
+layout (location = 4) in vec3 acoeff46g;
 
-layout (location = 13) in float acoeff1b;
-layout (location = 14) in float acoeff2b;
-layout (location = 15) in float acoeff3b;
-layout (location = 16) in float acoeff4b;
-layout (location = 17) in float acoeff5b;
-layout (location = 18) in float acoeff6b;
+layout (location = 5) in vec3 acoeff13b;
+layout (location = 6) in vec3 acoeff46b;
 
 // six coeff per channel
-out float coeff1r;
-out float coeff2r;
-out float coeff3r;
-out float coeff4r;
-out float coeff5r;
-out float coeff6r;
 
-out float coeff1g;
-out float coeff2g;
-out float coeff3g;
-out float coeff4g;
-out float coeff5g;
-out float coeff6g;
-
-out float coeff1b;
-out float coeff2b;
-out float coeff3b;
-out float coeff4b;
-out float coeff5b;
-out float coeff6b;
-
+out vec3 DiffColor;
+out vec3 NormalR;
+out vec3 NormalG;
+out vec3 NormalB;
 out vec3 FragPos;
 
 uniform mat4 projection;
 uniform mat4 view;
 uniform mat4 model;
 
+float computeLuPerChannel(float c0, float c1, float c2, float c3, float c4);
+float computeLvPerChannel(float c0, float c1, float c2, float c3, float c4);
+vec3 computeNormalPerChannel(float c0, float c1, float c2, float c3, float c4);
+float computeDiffuseColorPerChannel(float c0, float c1, float c2, float c3,
+                                    float c4, float c5, float Lu, float Lv);
+
+vec3 computeDiffuseColor(float c0r, float c1r,
+                         float c2r, float c3r,
+                         float c4r, float c5r,
+                         float c0g, float c1g,
+                         float c2g, float c3g,
+                         float c4g, float c5g,
+                         float c0b, float c1b,
+                         float c2b, float c3b,
+                         float c4b, float c5b);
+
 void main()
 {
+    vec3 surfaceNormalR = computeNormalPerChannel(
+        coeff13r.x, coeff13r.y, coeff13r.z, coeff46r.x, coeff46r.y
+    );
+    vec3 sugfaceNormalG = computeNormalPerChannel(
+        coeff13g.x, coeff13g.y, coeff13g.z, coeff46g.x, coeff46g.y
+    );
+    vec3 surfaceNormalB = computeNormalPerChannel(
+        coeff13b.x, coeff13b.y, coeff13b.z, coeff46b.x, coeff46b.y
+    );
+    vec3 diffColor = computeDiffuseColor(
+        coeff13r.x, coeff13r.y, coeff13r.z, coeff46r.x, coeff46r.y, coeff46r.z,
+        coeff13g.x, coeff13g.y, coeff13g.z, coeff46g.x, coeff46g.y, coeff46g.z,
+        coeff13b.x, coeff13b.y, coeff13b.z, coeff46b.x, coeff46b.y, coeff46b.z
+        );
+    DiffColor = diffColor;
+    NormalR = surfaceNormalR;
+    NormalG = surfaceNormalG;
+    NormalB = surfaceNormalB;
+    
     FragPos = vec3(model * vec4(aPos, 1.0));
     gl_Position = projection * view * model * vec4(aPos, 1.0);
-
-    coeff1r = acoeff1r;
-    coeff2r = acoeff2r;
-    coeff3r = acoeff3r;
-    coeff4r = acoeff4r;
-    coeff5r = acoeff5r;
-    coeff6r = acoeff6r;
-
-    coeff1g = acoeff1g;
-    coeff2g = acoeff2g;
-    coeff3g = acoeff3g;
-    coeff4g = acoeff4g;
-    coeff5g = acoeff5g;
-    coeff6g = acoeff6g;
-
-    coeff1b = acoeff1b;
-    coeff2b = acoeff2b;
-    coeff3b = acoeff3b;
-    coeff4b = acoeff4b;
-    coeff5b = acoeff5b;
-    coeff6b = acoeff6b;
 }
+
+
+float computeLuPerChannel(float c0, float c1, float c2, float c3, float c4)
+{
+    // taken directly from the paper of Tom Malzbender, Dan Gelb, Hans Wolters
+    // http://www.hpl.hp.com/ptm
+    return ((c2 * c4) - (2 * c1 * c3)) / ((4 * c0 * c1) - (c2 * c2));
+}
+
+float computeLvPerChannel(float c0, float c1, float c2, float c3, float c4)
+{ 
+    // taken directly from the paper of Tom Malzbender, Dan Gelb, Hans Wolters
+    // http://www.hpl.hp.com/ptm
+    return ((c2 * c3) - (2 * c0 * c4)) / ((4 * c0 * c1) - (c2 * c2));
+}
+
+vec3 computeNormalPerChannel(float c0, float c1, float c2, float c3, float c4)
+{
+    // taken directly from the paper of Tom Malzbender, Dan Gelb, Hans Wolters
+    // http://www.hpl.hp.com/ptm
+    float Lu = computeLuPerChannel(c0,c1,
+                                   c2, c3,
+                                   c4);
+    float Lv = computeLvPerChannel(c0, c1,
+                                   c2, c3,
+                                   c4);
+
+    return vec3(Lu, Lv, sqrt(1 - (Lu * Lu) - (Lv * Lv)));
+}
+
+float computeDiffuseColorPerChannel(float c0, float c1, float c2, float c3,
+                         float c4, float c5, float Lu, float Lv)
+{
+    // taken directly from the paper of Tom Malzbender, Dan Gelb, Hans Wolters
+    // http://www.hpl.hp.com/ptm
+    float term1 = c0 * Lu * Lu;
+    float term2 = c1 * Lv * Lv;
+    float term3 = c2 * Lu * Lv;
+    float term4 = c3 * Lu;
+    float term5 = c4 * Lv;
+    float term6 = c5;
+    return term1 + term2 + term3 + term4 + term5 + term6;
+}
+vec3 computeDiffuseColor(float c0r, float c1r,
+                         float c2r, float c3r,
+                         float c4r, float c5r,
+                         float c0g, float c1g,
+                         float c2g, float c3g,
+                         float c4g, float c5g,
+                         float c0b, float c1b,
+                         float c2b, float c3b,
+                         float c4b, float c5b)
+{
+    float LuR = computeLuPerChannel(
+        c0r, c1r, c2r, c3r, c4r
+    );
+    float LvR = computeLvPerChannel(
+        c0r, c1r, c2r, c3r, c4r
+    );
+    float LuG = computeLuPerChannel(
+        c0g, c1g, c2g, c3g, c4g
+    );
+    float LvG = computeLvPerChannel(
+        c0g, c1g, c2g, c3g, c4g
+    );
+    float LuB = computeLuPerChannel(
+        c0b, c1b, c2b, c3b, c4b
+    );
+    float LvB = computeLvPerChannel(
+        c0b, c1b, c2b, c3b, c4b
+    );
+    return vec3(
+    computeDiffuseColorPerChannel(c0r, c1r, c2r, c3r, c4r, c5r, LuR, LvR),
+    computeDiffuseColorPerChannel(c0g, c1g, c2g, c3g, c4g, c5g, LuG, LvG),
+    computeDiffuseColorPerChannel(c0b, c1b, c2b, c3b, c4b, c5b, LuB, LvB)
+    );
+}
+
+
 """
 
 rgbptmFshader = """
@@ -550,26 +552,11 @@ in vec3 FragPos;
 
 // six coeff per channel
 
-in float coeff1r;
-in float coeff2r;
-in float coeff3r;
-in float coeff4r;
-in float coeff5r;
-in float coeff6r;
+in vec3 NormalR;
+in vec3 NormalG;
+in vec3 NormalB;
 
-in float coeff1g;
-in float coeff2g;
-in float coeff3g;
-in float coeff4g;
-in float coeff5g;
-in float coeff6g;
-
-in float coeff1b;
-in float coeff2b;
-in float coeff3b;
-in float coeff4b;
-in float coeff5b;
-in float coeff6b;
+in vec3 DiffColor;
 
 uniform vec3 lightPos;
 uniform vec3 viewPos;
@@ -585,28 +572,9 @@ uniform vec3 ambientCoeffs;
 
 uniform bool blinn;
 
-float computeLuPerChannel(float c0, float c1, float c2, float c3, float c4);
-float computeLvPerChannel(float c0, float c1, float c2, float c3, float c4);
-vec3 computeNormalPerChannel(float c0, float c1, float c2, float c3, float c4);
-float computeDiffuseColorPerChannel(float c0, float c1, float c2, float c3,
-                                    float c4, float c5, float Lu, float Lv);
-vec3 computeDiffuseColor(float c0r, float c1r,
-                         float c2r, float c3r,
-                         float c4r, float c5r,
-                         float LuR, float LvR,
-                         float c0g, float c1g,
-                         float c2g, float c3g,
-                         float c4g, float c5g,
-                         float LuG, float LvG,
-                         float c0b, float c1b,
-                         float c2b, float c3b,
-                         float c4b, float c5b,
-                         float LuB, float LvB,
-                         );
+float computeAttenuation(float attC1, float attC2, float attC3, float distVal);
 
-float computeAttenuation(float attC1, float attC2, float attC3, float dist);
-
-float computeFragColorPerChannel(vec3 surfaceNormal, float attc1, 
+float computeFragColorPerChannel(vec3 surfaceNormal, float attc1,
                                 float attc2, float attc3,
                                 float objDiffuseChannelIntensity,
                                 float objDiffuseChannelCoeff,
@@ -621,20 +589,12 @@ float computeFragColorPerChannel(vec3 surfaceNormal, float attc1,
 
 void main()
 {
-    vec3 surfaceNormalR = computeNormalPerChannel(
-        coeff1r, coeff2r, coeff3r, coeff4r, coeff5r
-    );
-    vec3 surfaceNormalG = computeNormalPerChannel(
-        coeff1g, coeff2g, coeff3g, coeff4g, coeff5g
-    );
-    vec3 surfaceNormalB = computeNormalPerChannel(
-        coeff1b, coeff2b, coeff3b, coeff4b, coeff5b
-    );
-    vec3 diffuseColor = computeDiffuseColor(
-        coeff1r, coeff2r, coeff3r, coeff4r, coeff5r, coeff6r,
-        coeff1g, coeff2g, coeff3g, coeff4g, coeff5g, coeff6g,
-        coeff1b, coeff2b, coeff3b, coeff4b, coeff5b, coeff6b,
-    );
+        vec3 diffuseColor = computeDiffuseColor(coeff1r, coeff2r, coeff3r, 
+                                            coeff4r, coeff5r, coeff6r, 
+                                            coeff1g, coeff2g, coeff3g, 
+                                            coeff4g, coeff5g, coeff6g,
+                                            coeff1b, coeff2b, coeff3b,
+                                            coeff4b, coeff5b, coeff6b);
 
     float redC = computeFragColorPerChannel(
                     surfaceNormalR,
@@ -685,82 +645,6 @@ void main()
                     lightPos,
                     blinn);
     FragColor = vec4(redC, greenC, blueC, 1.0);
-}
-
-float computeLuPerChannel(float c0, float c1, float c2, float c3, float c4)
-{
-    // taken directly from the paper of Tom Malzbender, Dan Gelb, Hans Wolters
-    // http://www.hpl.hp.com/ptm
-    return ((c2 * c4) - (2 * c1 * c3)) / ((4 * c0 * c1) - (c2 * c2));
-}
-
-float computeLvPerChannel(float c0, float c1, float c2, float c3, float c4)
-{ 
-    // taken directly from the paper of Tom Malzbender, Dan Gelb, Hans Wolters
-    // http://www.hpl.hp.com/ptm
-    return ((c2 * c3) - (2 * c0 * c4)) / ((4 * c0 * c1) - (c2 * c2));
-}
-
-vec3 computeNormalPerChannel(float c0, float c1, float c2, float c3, float c4)
-{
-    // taken directly from the paper of Tom Malzbender, Dan Gelb, Hans Wolters
-    // http://www.hpl.hp.com/ptm
-    float Lu = computeLuPerChannel(float c0, float c1,
-                                   float c2, float c3,
-                                   float c4);
-    float Lv = computeLvPerChannel(float c0, float c1,
-                                   float c2, float c3,
-                                   float c4);
-
-    return vec3(Lu, Lv, sqrt(1 - (Lu * Lu) - (Lv * Lv));
-}
-
-float computeDiffuseColorPerChannel(float c0, float c1, float c2, float c3,
-                         float c4, float c5, float Lu, float Lv)
-{
-    // taken directly from the paper of Tom Malzbender, Dan Gelb, Hans Wolters
-    // http://www.hpl.hp.com/ptm
-    float term1 = c0 * Lu * Lu;
-    float term2 = c1 * Lv * Lv;
-    float term3 = c2 * Lu * Lv;
-    float term4 = c3 * Lu;
-    float term5 = c4 * Lv;
-    float term6 = c5;
-    return term1 + term2 + term3 + term4 + term5 + term6;
-}
-vec3 computeDiffuseColor(float c0r, float c1r,
-                         float c2r, float c3r,
-                         float c4r, float c5r,
-                         float c0g, float c1g,
-                         float c2g, float c3g,
-                         float c4g, float c5g,
-                         float c0b, float c1b,
-                         float c2b, float c3b,
-                         float c4b, float c5b)
-{
-    float LuR = computeLuPerChannel(
-        c1r, c2r, c3r, c4r, c5r, c6r
-    );
-    float LvR = computeLvPerChannel(
-        c1r, c2r, c3r, c4r, c5r, c6r
-    );
-    float LuG = computeLuPerChannel(
-        c1g, c2g, c3g, c4g, c5g, c6g
-    );
-    float LvG = computeLvPerChannel(
-        c1g, c2g, c3g, c4g, c5g, c6g
-    );
-    float LuB = computeLuPerChannel(
-        c1b, c2b, c3b, c4b, c5b, c6b
-    );
-    float LvB = computeLvPerChannel(
-        c1b, c2b, c3b, c4b, c5b, c6b
-    );
-    return vec3(
-    computeDiffuseColorPerChannel(c0r, c1r, c2r, c3r, c4r, c5r, LuR, LvR),
-    computeDiffuseColorPerChannel(c0g, c1g, c2g, c3g, c4g, c5g, LuG, LvG),
-    computeDiffuseColorPerChannel(c0b, c1b, c2b, c3b, c4b, c5b, LuB, LvB)
-    );
 }
 
 float computeAttenuation(float attC1, float attC2, float attC3, float dist)
@@ -857,18 +741,6 @@ shaders = {
             "aBiTangent": {"layout": 4, "size": 3, "offset": 11},
         },
     },
-    "quadPerChannelTest": {
-        "fragment": quadFshaderPerChannelTest,
-        "vertex": quadVshader,
-        "attribute_info": {
-            "stride": None,
-            "aPos": {"layout": 0, "size": 3, "offset": 0},
-            "aNormal": {"layout": 1, "size": 3, "offset": 3},
-            "aTexCoord": {"layout": 2, "size": 2, "offset": 6},
-            "aTangent": {"layout": 3, "size": 3, "offset": 8},
-            "aBiTangent": {"layout": 4, "size": 3, "offset": 11},
-        },
-    },
     "lamp": {
         "fragment": lampFshader,
         "vertex": lampVshader,
@@ -877,7 +749,7 @@ shaders = {
             "aPos": {"layout": 0, "size": 3, "offset": 0},
         },
     },
-    "rgbptm": {
+    "rgbcoeff": {
         "fragment": rgbptmFshader,
         "vertex": rgbptmVshader,
         "attribute_info": {

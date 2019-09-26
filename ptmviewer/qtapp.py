@@ -16,6 +16,7 @@ from PIL import Image, ImageQt
 from ptmviewer.interface.window import Ui_MainWindow
 from ptmviewer.glwidget import PtmLambertianGLWidget, PtmNormalMapGLWidget
 from ptmviewer.glwidget import PtmPerChannelNormalMapGLWidget
+from ptmviewer.glwidget import PtmCoefficientShader
 from ptmviewer.rgbptm import RGBPTM
 
 
@@ -86,6 +87,7 @@ class AppWindowFinal(AppWindowInit):
             "Lambertian": PtmLambertianGLWidget,
             "SingleNormalMap": PtmNormalMapGLWidget,
             "PerChannelNormalMap": PtmPerChannelNormalMapGLWidget,
+            "CoefficientShader": PtmCoefficientShader,
         }
         wnames = [k for k in self.availableGlWidgets.keys()]
         self.shaderCombo.addItems(wnames)
@@ -125,6 +127,8 @@ class AppWindowFinal(AppWindowInit):
             self.runSingleNormalMapPipeLine(glchoice, ptm)
         elif glchoice == "PerChannelNormalMap":
             self.runPerChannelNormalMapPipeLine(glchoice, ptm)
+        elif glchoice == "CoefficientShader":
+            self.runRGBCoeffShaderPipeline(glchoice, ptm)
 
     def runLambertianPipeLine(self, glchoice: str, ptm):
         "run lambertian pipeline"
@@ -150,6 +154,12 @@ class AppWindowFinal(AppWindowInit):
         nmaps = ptm.getNormalMaps()
         nmaps = [ImageQt.ImageQt(nmap) for nmap in nmaps]
         glwidget = self.availableGlWidgets[glchoice](imqt, nmaps)
+        self.replaceViewerWidget(glwidget)
+
+    def runRGBCoeffShaderPipeline(self, glchoice: str, ptm):
+        "pipeline for rgb coefficient shader"
+        vertices, vertexNb = ptm.getNbVertices()
+        glwidget = self.availableGlWidgets[glchoice](vertices, vertexNb)
         self.replaceViewerWidget(glwidget)
 
     def moveGLCamera(self, direction: str):

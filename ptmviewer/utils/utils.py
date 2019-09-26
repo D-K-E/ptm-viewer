@@ -75,6 +75,13 @@ def getDistancePoint2Array(apoint, coordarr):
     return np.sqrt(xdist + ydist)
 
 
+def getInterpolationTable(arr: np.ndarray,
+        mapRange: Tuple[float, float]) -> dict:
+    "Interpolate given one dimensional array into given range output as a table"
+    assert arr.ndim == 1
+    newarr = np.interp(arr, (arr.min(), arr.max()), mapRange)
+    return {arr[i]:newarr[i] for i in range(arr.size)}
+
 class ImageArray:
     "Image array have some additional properties besides np.ndarray"
 
