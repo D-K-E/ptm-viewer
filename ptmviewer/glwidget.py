@@ -902,13 +902,14 @@ class PtmPerChannelNormalMapGLWidget(PtmNormalMapGLWidget):
     "implement per channel normal map shader with opengl widget"
 
     def __init__(self, ptmImage: QImage, normalMaps: Tuple[QImage],
-                 lampShaderName="lamp", objectShaderName="quadPerChannel",
+                 lampShaderName="lamp", objectShaderName="quadSpot",
                  parent=None):
         super().__init__(ptmImage=ptmImage, normalMap=normalMaps[0],
                          lampShaderName=lampShaderName,
-                         objectShaderName=objectShaderName, parent=parent)
+                         objectShaderName=objectShaderName,
+                         parent=parent)
         self.textures = [
-            {"texture": None, "unit": 0, "name": "diffuseMap",
+            {"texture": None, "unit": 0, "name": "material.diffuseMap",
              "data": ptmImage.mirrored()}
         ]
         for i in range(len(normalMaps)):
@@ -916,7 +917,7 @@ class PtmPerChannelNormalMapGLWidget(PtmNormalMapGLWidget):
             self.textures.append({
                 "unit": i+1,
                 "data": nmap,
-                "name": "normalMap" + str(i),
+                "name": "material.normalMap" + str(i),
                 "texture": None})
         #
         self.vertices = None
@@ -935,26 +936,32 @@ class PtmPerChannelNormalMapGLWidget(PtmNormalMapGLWidget):
         self.program.setUniformValue("projection", projectionMatrix)
         self.program.setUniformValue("view", viewMatrix)
         self.program.setUniformValue("model", model)
-        self.program.setUniformValue("lightPos", self.lamp.position)
-        self.program.setUniformValue("lightDirection", self.lamp.direction)
-        self.program.setUniformValue("lightColor", self.lamp.color)
-        self.program.setUniformValue("attc1", self.lamp.attenConst)
-        self.program.setUniformValue("attc2", self.lamp.attenLinear)
-        self.program.setUniformValue("attc3", self.lamp.attenQuad)
-        self.program.setUniformValue("cutOff", self.lamp.cutOff)
         self.program.setUniformValue("viewPos", self.camera.position)
-        self.program.setUniformValue("ambientCoeff", self.ambientCoeff)
-        self.program.setUniformValue("shininess", self.shininess)
+        self.program.setUniformValue("light.position", self.lamp.position)
+        self.program.setUniformValue("light.direction", self.lamp.direction)
+        self.program.setUniformValue("light.cutOff", self.lamp.cutOff)
+        self.program.setUniformValue("light.outerCutOff",
+                                     self.lamp.outerCutOff)
+        self.program.setUniformValue("light.attenuation",
+                                     self.lamp.attenuation)
+        self.program.setUniformValue("light.color",
+                                     self.lamp.color)
+        self.program.setUniformValue("material.shininess",
+                                     self.shininess)
+        self.program.setUniformValue("ambient", QVector3D(self.ambientCoeff,
+                                                          self.ambientCoeff,
+                                                          self.ambientCoeff)
+                                     )
 
 
 class PtmCoefficientShader(AbstractPointLightPtmGLWidget):
     "Use directly ptm coefficients in shader"
 
     def __init__(self, coeffs: np.ndarray,
-            vertexNb: int,
-            lampShaderName="lamp",
-            objectShaderName="rgbcoeff",
-            parent=None):
+                 vertexNb: int,
+                 lampShaderName="lamp",
+                 objectShaderName="rgbcoeff",
+                 parent=None):
         super().__init__(parent=parent)
         self.vertices = coeffs
         self.isBlinn = False
@@ -1098,7 +1105,6 @@ class PtmCoefficientShader(AbstractPointLightPtmGLWidget):
         self.vao.release()
         # create texture
         self.createTextures()
-
 
     def paintGL(self):
         "paint gl drawing loop"

@@ -142,8 +142,7 @@ void main() {
     FragColor = vec4(phong1 + phong2 + ambientTerm, 1.0);
 }
 """
-
-quadVshader = """
+quadVshaderDir = """
 #version 330 core
 
 // specify input
@@ -156,16 +155,27 @@ in vec3 aBiTangent;
 // specify output
 out vec3 FragPos;
 out vec2 TexCoords;
-out vec3 TangentLightPos;
 out vec3 TangentViewPos;
 out vec3 TangentFragPos;
+out DLight {
+    vec3 TangentLightDir;
+    vec3 color;
+} dirLight;
 
 uniform mat4 projection;
 uniform mat4 view;
 uniform mat4 model;
 
-uniform vec3 lightPos;
 uniform vec3 viewPos;
+
+struct DirLightSource {
+
+    vec3 direction;
+    vec3 color;
+
+};
+uniform DirLightSource light;
+
 
 // function
 
@@ -184,10 +194,439 @@ void main()
 
     // computing light position and view position in tangent space
     mat3 TBN = transpose(mat3(TanV, BiTanV, NormV));
-    TangentLightPos = TBN * lightPos;
     TangentViewPos = TBN * viewPos;
     TangentFragPos = TBN * FragPos;
+    dirLight.TangentLightDir = TBN * light.direction;
+    dirLight.color = light.color;
     gl_Position = projection * view * model * vec4(aPos, 1.0);
+}
+"""
+quadFshaderDir = """
+#version 330 core
+in vec3 FragPos;
+in vec2 TexCoords;
+in vec3 TangentViewPos;
+in vec3 TangentFragPos;
+in DLight {
+    vec3 TangentLightDir;
+    vec3 color;
+} light;
+out vec4 FragColor;
+
+struct PtmMaterial {
+
+    sampler2D diffuseMap; // object colors per fragment
+    sampler2D normalMap1; // normals per vertex
+    sampler2D normalMap2; // normals per vertex
+    sampler2D normalMap3; // normals per vertex
+    float shininess;
+
+};
+uniform PtmMaterial material;
+uniform vec3 ambient;
+
+float computeColorPerChannelDir(vec3 normal, vec3 lightDir, float intensity);
+
+void main(void)
+{
+    // obtain normal map from texture [0,1]
+    vec3 normalr = texture(material.normalMap1, TexCoords).rgb;
+    vec3 normalg = texture(material.normalMap2, TexCoords).rgb;
+    vec3 normalb = texture(material.normalMap3, TexCoords).rgb;
+    // transform vector to range [-1,1]
+    normalr = normalize((normalr * 2.0) - 1.0);
+    normalg = normalize((normalg * 2.0) - 1.0);
+    normalb = normalize((normalb * 2.0) - 1.0);
+
+    // get diffuse color for object
+    vec3 viewDirection = normalize(TangentViewPos - TangentFragPos);
+    vec3 objColor = texture(material.diffuseMap, TexCoords).rgb;
+    float red = computeColorPerChannelDir(normalr, objColor.x, ambient.x,
+                                       material.shininess, light,
+                                       viewDirection);
+    float green = computeColorPerChannelDir(normalg, objColor.y, ambient.y,
+                                       material.shininess, light,
+                                       viewDirection);
+    float blue = computeColorPerChannelDir(normalb, objColor.z, ambient.z,
+                                       material.shininess, light,
+                                       viewDirection)
+    FragColor = vec4(red, green, blue, 1.0);
+}
+
+float computeColorPerChannelDir(vec3 normal,
+                             float objIntensity,
+                             float ambientIntensity,
+                             float shininess,
+                             DLight light,
+                             vec3 viewDir)
+{
+    vec3 lightDir = normalize(-light.TangentLightDir);
+    // costheta for direction
+    float costheta = max(dot(normal, lightDir), 0.0);
+    // specular
+    vec3 reflectDir = reflect(-lightDir, normal);
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
+    float diffIntensity = light.color * costheta * objIntensity;
+    float specIntensity = light.color * spec * objIntensity;
+    return (diffIntensity + ambientIntensity + specIntensity);
+}
+"""
+
+quadVshaderPoint = """
+#version 330 core
+
+// specify input
+in vec3 aPos;
+in vec3 aNormal;
+in vec2 aTexCoord;
+in vec3 aTangent;
+in vec3 aBiTangent;
+
+// specify output
+out vec3 FragPos;
+out vec2 TexCoords;
+out vec3 TangentViewPos;
+out vec3 TangentFragPos;
+out PLight {
+    vec3 TangentLightPos;
+    vec3 color;
+    vec3 attenuation;
+} pointLight;
+
+uniform mat4 projection;
+uniform mat4 view;
+uniform mat4 model;
+
+uniform vec3 viewPos;
+
+struct PointLightSource {
+
+    vec3 position;
+    vec3 color;
+    vec3 attenuation;
+
+};
+uniform PointLightSource light;
+
+
+// function
+
+void main()
+{
+    FragPos = vec3(model * vec4(aPos, 1.0));
+    TexCoords = aTexCoord;
+
+    // create tangent bitangent normal matrix for
+    // transforming light coordinates
+    mat3 normMat = transpose(inverse(mat3(model)));
+    vec3 TanV = normalize(normMat * aTangent);
+    vec3 NormV = normalize(normMat * aNormal);
+    TanV = normalize(TanV - dot(TanV, NormV) * NormV);
+    vec3 BiTanV = cross(TanV, NormV);
+
+    // computing light position and view position in tangent space
+    mat3 TBN = transpose(mat3(TanV, BiTanV, NormV));
+    TangentViewPos = TBN * viewPos;
+    TangentFragPos = TBN * FragPos;
+    pointLight.TangentLightPos = TBN * light.position;
+    pointLight.color = light.color;
+    pointLight.attenuation = light.attenuation;
+    gl_Position = projection * view * model * vec4(aPos, 1.0);
+}
+
+"""
+
+quadFshaderPoint = """
+#version 330 core
+in vec3 FragPos;
+in vec2 TexCoords;
+in vec3 TangentViewPos;
+in vec3 TangentFragPos;
+in PLight {
+    vec3 TangentLightPos;
+    vec3 color;
+    vec3 attenuation;
+} pointLight;
+
+out vec4 FragColor;
+
+struct PointLight {
+    vec3 position;
+    vec3 color;
+    vec3 attenuation;
+};
+
+struct PtmMaterial {
+
+    sampler2D diffuseMap; // object colors per fragment
+    sampler2D normalMap1; // normals per vertex
+    sampler2D normalMap2; // normals per vertex
+    sampler2D normalMap3; // normals per vertex
+    float shininess;
+
+};
+
+uniform PtmMaterial material;
+uniform vec3 ambient;
+uniform vec3 viewPos;
+
+float computeColorPerChannelPoint(vec3 normal, float intensity,
+                                  float ambientIntensity,
+                                  float lightIntensity,
+                                  float shininess,
+                                  PointLight light,
+                                  vec3 viewDir);
+float computeAttenuation(vec3 att, float distVal);
+
+void main(void)
+{
+    // obtain normal map from texture [0,1]
+    vec3 normalr = texture(material.normalMap1, TexCoords).rgb;
+    vec3 normalg = texture(material.normalMap2, TexCoords).rgb;
+    vec3 normalb = texture(material.normalMap3, TexCoords).rgb;
+    // transform vector to range [-1,1]
+    normalr = normalize((normalr * 2.0) - 1.0);
+    normalg = normalize((normalg * 2.0) - 1.0);
+    normalb = normalize((normalb * 2.0) - 1.0);
+
+    // get diffuse color for object
+    vec3 viewDirection = normalize(TangentViewPos - TangentFragPos);
+    vec3 objColor = texture(material.diffuseMap, TexCoords).rgb;
+    PointLight light;
+    light.position = pointLight.TangentLightPos;
+    light.color = pointLight.color;
+    light.attenuation = pointLight.attenuation;
+
+    float red = computeColorPerChannelPoint(normalr, objColor.x, ambient.x,
+                                            light.color.x,
+                                       material.shininess, light,
+                                       viewDirection);
+    float green = computeColorPerChannelPoint(normalg, objColor.y, ambient.y,
+                                            light.color.y,
+                                       material.shininess, light,
+                                       viewDirection);
+    float blue = computeColorPerChannelPoint(normalb, objColor.z, ambient.z,
+                                            light.color.z,
+                                       material.shininess, light,
+                                       viewDirection);
+    FragColor = vec4(red, green, blue, 1.0);
+}
+
+float computeColorPerChannelPoint(vec3 normal,
+                                  float objIntensity,
+                                  float ambientIntensity,
+                                  float lightIntensity,
+                                  float shininess,
+                                  PointLight light,
+                                  vec3 viewDir)
+{
+    vec3 lightDir = normalize(light.position - TangentFragPos);
+
+    // compute distance and attenuation
+    float distVal = length(light.position - TangentFragPos);
+    float atten = computeAttenuation(light.attenuation, distVal);
+
+    // costheta for direction
+    float costheta = max(dot(normal, lightDir), 0.0);
+    // specular
+    vec3 reflectDir = reflect(-lightDir, normal);
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
+    //
+    float diffIntensity = lightIntensity * costheta * objIntensity;
+    float specIntensity = lightIntensity * spec * objIntensity;
+    diffIntensity = diffIntensity * atten;
+    specIntensity = specIntensity * atten;
+    return (diffIntensity + specIntensity + ambientIntensity);
+
+}
+float computeAttenuation(vec3 att, float distVal)
+{
+    // f_att = min(\frac{1}{c_1 + c_2{\times}d_L + c_3{\times}d^2_{L}} , 1)
+    float distSqr = distVal * distVal;
+    float att1 = distVal * att.y;
+    float att2 = distSqr * att.z;
+    float result = att.x + att2 + att1;
+    result = 1 / result;
+    return min(result, 1.0);
+}
+"""
+
+
+quadVshaderSpot = """
+#version 330 core
+
+// specify input
+in vec3 aPos;
+in vec3 aNormal;
+in vec2 aTexCoord;
+in vec3 aTangent;
+in vec3 aBiTangent;
+
+// specify output
+out vec3 FragPos;
+out vec2 TexCoords;
+out vec3 TangentViewPos;
+out vec3 TangentFragPos;
+out SLight {
+    vec3 TangentLightDir;
+    vec3 TangentLightPos;
+    float cutOff;
+    float outerCutOff;
+    vec3 attenuation;
+    vec3 color;
+} spotLight;
+
+uniform mat4 projection;
+uniform mat4 view;
+uniform mat4 model;
+
+uniform vec3 viewPos;
+
+struct SpotLight {
+
+    vec3 position;
+    vec3 direction;
+    float cutOff;
+    float outerCutOff;
+    vec3 attenuation;
+    vec3 color;
+
+};
+uniform SpotLight light;
+
+
+// function
+
+void main()
+{
+    FragPos = vec3(model * vec4(aPos, 1.0));
+    TexCoords = aTexCoord;
+
+    // create tangent bitangent normal matrix for
+    // transforming light coordinates
+    mat3 normMat = transpose(inverse(mat3(model)));
+    vec3 TanV = normalize(normMat * aTangent);
+    vec3 NormV = normalize(normMat * aNormal);
+    TanV = normalize(TanV - dot(TanV, NormV) * NormV);
+    vec3 BiTanV = cross(TanV, NormV);
+
+    // computing light position and view position in tangent space
+    mat3 TBN = transpose(mat3(TanV, BiTanV, NormV));
+    spotLight.TangentLightPos = TBN * light.position;
+    TangentViewPos = TBN * viewPos;
+    TangentFragPos = TBN * FragPos;
+    spotLight.TangentLightDir = TBN * light.direction;
+    spotLight.cutOff = light.cutOff;
+    spotLight.outerCutOff = light.outerCutOff;
+    spotLight.attenuation = light.attenuation;
+    spotLight.color = light.color;
+    gl_Position = projection * view * model * vec4(aPos, 1.0);
+}
+"""
+
+quadFshaderSpot = """
+#version 330 core
+in vec3 FragPos;
+in vec2 TexCoords;
+in vec3 TangentViewPos;
+in vec3 TangentFragPos;
+in SLight {
+    vec3 TangentLightPos;
+    vec3 TangentLightDir;
+    vec3 color;
+    vec3 attenuation;
+    float cutOff;
+    float outerCutOff;
+} spotLight;
+
+out vec4 FragColor;
+
+struct PtmMaterial {
+
+    sampler2D diffuseMap; // object colors per fragment
+    sampler2D normalMap1; // normals per vertex
+    sampler2D normalMap2; // normals per vertex
+    sampler2D normalMap3; // normals per vertex
+    float shininess;
+
+};
+
+uniform PtmMaterial material;
+uniform vec3 ambient;
+uniform vec3 viewPos;
+
+float computeColorPerChannelSpot(vec3 normal, vec3 lightDir, vec3 viewDir,
+                                  SLight light, float intensity,
+                                  float ambientIntensity);
+float computeAttenuation(vec3 att, float distVal);
+
+void main(void)
+{
+    // obtain normal map from texture [0,1]
+    vec3 normalr = texture(material.normalMap1, TexCoords).rgb;
+    vec3 normalg = texture(material.normalMap2, TexCoords).rgb;
+    vec3 normalb = texture(material.normalMap3, TexCoords).rgb;
+    // transform vector to range [-1,1]
+    normalr = normalize((normalr * 2.0) - 1.0);
+    normalg = normalize((normalg * 2.0) - 1.0);
+    normalb = normalize((normalb * 2.0) - 1.0);
+
+    // get diffuse color for object
+    vec3 viewDirection = normalize(TangentViewPos - TangentFragPos);
+    vec3 objColor = texture(material.diffuseMap, TexCoords).rgb;
+
+    float red = computeColorPerChannelSpot(normalr, objColor.x, ambient.x,
+                                       material.shininess, spotLight,
+                                       viewDirection);
+    float green = computeColorPerChannelSpot(normalg, objColor.y, ambient.y,
+                                       material.shininess, spotLight,
+                                       viewDirection);
+    float blue = computeColorPerChannelSpot(normalb, objColor.z, ambient.z,
+                                       material.shininess, spotLight,
+                                       viewDirection)
+    FragColor = vec4(red, green, blue, 1.0);
+}
+
+float computeColorPerChannelSpot(vec3 normal,
+                                 float objIntensity,
+                                 float ambientIntensity,
+                                 float shininess,
+                                 SLight light,
+                                 vec3 viewDir)
+{
+    vec3 lightDir = normalize(light.TangentLightPos - TangentFragPos);
+
+    // compute distance and attenuation
+    float distVal = length(light.TangentLightPos - TangentFragPos);
+    float atten = computeAttenuation(light.attenuation, distVal);
+
+    // spotlight intensity
+    float theta = dot(lightDir, normalize(-light.TangentLightDir));
+    float epsilon = light.cutOff - light.outerCutOff;
+    float intens = clamp((theta - light.outerCutOff) / epsilon, 0.0, 1.0);
+
+    // costheta for direction
+    float costheta = max(dot(normal, lightDir), 0.0);
+    // specular
+    vec3 reflectDir = reflect(-lightDir, normal);
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
+    //
+    float diffIntensity = light.color * costheta * objIntensity;
+    float specIntensity = light.color * spec * objIntensity;
+    diffIntensity = diffIntensity * atten * intens;
+    specIntensity = specIntensity * atten * intens;
+    return (diffIntensity + specIntensity + ambientIntensity);
+
+}
+float computeAttenuation(vec3 att, float distVal)
+{
+    // f_att = min(\frac{1}{c_1 + c_2{\times}d_L + c_3{\times}d^2_{L}} , 1)
+    float distSqr = distVal * distVal;
+    float att1 = distVal * att.y;
+    float att2 = distSqr * att.z;
+    float result = att.x + att2 + att1;
+    result = 1 / result;
+    return min(result, 1.0);
 }
 """
 
@@ -245,32 +684,30 @@ void main()
 }
 """
 
-quadFshaderPerChannel = """
+quadFshaderPerChannelSpot = """
 #version 330 core
+
 in vec3 FragPos;
 in vec2 TexCoords;
 in vec3 TangentLightPos;
+in vec3 TangentLightDir;
 in vec3 TangentViewPos;
 in vec3 TangentFragPos;
 
 out vec4 FragColor;
 
-uniform sampler2D diffuseMap; // object colors per fragment
-uniform sampler2D normalMap1; // normals per vertex
-uniform sampler2D normalMap2; // normals per vertex
-uniform sampler2D normalMap3; // normals per vertex
+struct PtmMaterial {
 
-uniform float ambientCoeff;
-uniform float shininess;
-uniform float attc1;
-uniform float attc2;
-uniform float attc3;
-uniform float cutOff;
+    uniform sampler2D diffuseMap; // object colors per fragment
+    uniform sampler2D normalMap1; // normals per vertex
+    uniform sampler2D normalMap2; // normals per vertex
+    uniform sampler2D normalMap3; // normals per vertex
+    uniform float shininess;
 
-uniform vec3 lightPos;
-uniform vec3 lightDirection;
-uniform vec3 lightColor;
-uniform vec3 viewPos;
+};
+
+
+uniform PtmMaterial material;
 
 float computeDiffColorPerChannel(vec3 normal, vec3 lightDir, float intensity);
 float computeSpecColorPerChannel(vec3 normal, vec3 dirVec,
@@ -279,53 +716,54 @@ vec3 computeSpecColor(vec3 normal1, vec3 normal2, vec3 normal3, vec3 dirVec,
                       float shininess, vec3 color);
 vec3 computeDiffColor(vec3 normal1, vec3 normal2, vec3 normal3, vec3 lightDir,
                       vec3 color);
-float computeAttenuation(float attC1, float attC2, float attC3, float dist);
+float computeAttenuation(vec3 att, float distVal);
+
 
 
 void main()
 {
     // obtain normal map from texture [0,1]
-    vec3 normalr = texture(normalMap1, TexCoords).rgb;
-    vec3 normalg = texture(normalMap2, TexCoords).rgb;
-    vec3 normalb = texture(normalMap3, TexCoords).rgb;
-    
+    vec3 normalr = texture(material.normalMap1, TexCoords).rgb;
+    vec3 normalg = texture(material.normalMap2, TexCoords).rgb;
+    vec3 normalb = texture(material.normalMap3, TexCoords).rgb;
+
     // get diffuse color for object
-    vec3 color = texture(diffuseMap, TexCoords).rgb;
+    vec3 color = texture(material.diffuseMap, TexCoords).rgb;
 
     // attenuation
     float distanceLightFrag = length(TangentLightPos - TangentFragPos);
-    float att = computeAttenuation(attc1, attc2, attc3, distanceLightFrag);
+    float att = computeAttenuation(light.attenuation, distanceLightFrag);
 
     // ambient color for object
     vec3 ambientColor = color * ambientCoeff;
 
-
     // simple light direction
-    vec3 lightDir = normalize(TangentLightPos - TangentFragPos);
+    vec3 tanLightDir = normalize(TangentLightPos - TangentFragPos);
 
     // spotlight cone theta
-    float theta = dot(lightDir, lightDirection);
+    float theta = dot(tanLightDir, TangentLightDir);
+
     // costheta
-    vec3 diffuseColor = computeDiffColor(normalr, normalg, normalb, lightDir,
-                                         color) * att;
+    vec3 diffuseColor = computeDiffColor(normalr, normalg, normalb,
+                                         tanLightDir, color) * att;
     // specular
     vec3 viewDir = normalize(TangentViewPos - TangentFragPos);
-    // vec3 reflectDir = reflect(-lightDir, normal);
-    vec3 halfway = normalize(lightDir + viewDir);
+    // vec3 reflectDir = reflect(-tanLightDir, normal);
+    vec3 halfway = normalize(tanLightDir + viewDir);
     vec3 specularColor = computeSpecColor(normalr, normalg, normalb, halfway,
                                           shininess, lightColor) * att;
     // final fragment color
     FragColor = vec4(ambientColor + diffuseColor + specularColor, 1.0);
 }
 
-float computeAttenuation(float attC1, float attC2, float attC3, float dist)
+
+float computeAttenuation(vec3 att, float distVal)
 {
-    /* f_att = min(\frac{1}{c_1 + c_2{\times}d_L + c_3{\times}d^2_{L}} , 1)
-    */
-    float distSqr = dist * dist;
-    float att1 = dist * attC2;
-    float att2 = distSqr * attC3;
-    float result = attC1 + att2 + att1;
+    // f_att = min(\frac{1}{c_1 + c_2{\times}d_L + c_3{\times}d^2_{L}} , 1)
+    float distSqr = distVal * distVal;
+    float att1 = distVal * att.y;
+    float att2 = distSqr * att.z;
+    float result = att.x + att2 + att1;
     result = 1 / result;
     return min(result, 1.0);
 }
@@ -348,7 +786,7 @@ vec3 computeDiffColor(vec3 normal1, vec3 normal2, vec3 normal3, vec3 lightDir,
     return diffuseColor;
 }
 
-float computeSpecColorPerChannel(vec3 normal, vec3 dirVec, 
+float computeSpecColorPerChannel(vec3 normal, vec3 dirVec,
                                  float shininess, float intensity)
 {
     normal = normalize((normal * 2.0) - 1.0);
@@ -370,6 +808,168 @@ vec3 computeSpecColor(vec3 normal1, vec3 normal2, vec3 normal3, vec3 dirVec,
     return specularColor;
 }
 """
+
+quadFshaderPerChannelMulti = """
+#version 330 core
+
+in vec3 FragPos;
+in vec2 TexCoords;
+in vec3 TangentLightPos;
+in vec3 TangentLightDir;
+in vec3 TangentViewPos;
+in vec3 TangentFragPos;
+
+out vec4 FragColor;
+
+struct PtmMaterial {
+
+uniform sampler2D diffuseMap; // object colors per fragment
+uniform sampler2D normalMap1; // normals per vertex
+uniform sampler2D normalMap2; // normals per vertex
+uniform sampler2D normalMap3; // normals per vertex
+uniform float shininess;
+
+};
+
+struct DirLight {
+    vec3 directional;
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+};
+
+struct PointLight {
+
+    vec3 position;
+    vec3 attenuation;
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+
+};
+
+struct SpotLight {
+
+    vec3 position;
+    vec3 direction;
+    float cutOff;
+    float outerCutOff;
+    vec3 attenuation;
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+
+};
+
+uniform float ambientCoeff;
+uniform vec3 attc;
+uniform float cutOff;
+
+uniform vec3 lightPos;
+uniform vec3 lightDirection;
+uniform vec3 lightColor;
+uniform vec3 viewPos;
+
+float computeDiffColorPerChannel(vec3 normal, vec3 lightDir, float intensity);
+float computeSpecColorPerChannel(vec3 normal, vec3 dirVec,
+                                 float shininess, float intensity);
+vec3 computeSpecColor(vec3 normal1, vec3 normal2, vec3 normal3, vec3 dirVec,
+                      float shininess, vec3 color);
+vec3 computeDiffColor(vec3 normal1, vec3 normal2, vec3 normal3, vec3 lightDir,
+                      vec3 color);
+float computeAttenuation(vec3 att, float distVal);
+
+
+
+void main()
+{
+    // obtain normal map from texture [0,1]
+    vec3 normalr = texture(normalMap1, TexCoords).rgb;
+    vec3 normalg = texture(normalMap2, TexCoords).rgb;
+    vec3 normalb = texture(normalMap3, TexCoords).rgb;
+
+    // get diffuse color for object
+    vec3 color = texture(diffuseMap, TexCoords).rgb;
+
+    // attenuation
+    float distanceLightFrag = length(TangentLightPos - TangentFragPos);
+    float att = computeAttenuation(attc, distanceLightFrag);
+
+    // ambient color for object
+    vec3 ambientColor = color * ambientCoeff;
+
+    // simple light direction
+    vec3 tanLightDir = normalize(TangentLightPos - TangentFragPos);
+
+    // spotlight cone theta
+    float theta = dot(tanLightDir, TangentLightDir);
+
+    // costheta
+    vec3 diffuseColor = computeDiffColor(normalr, normalg, normalb,
+                                         tanLightDir, color) * att;
+    // specular
+    vec3 viewDir = normalize(TangentViewPos - TangentFragPos);
+    // vec3 reflectDir = reflect(-tanLightDir, normal);
+    vec3 halfway = normalize(tanLightDir + viewDir);
+    vec3 specularColor = computeSpecColor(normalr, normalg, normalb, halfway,
+                                          shininess, lightColor) * att;
+    // final fragment color
+    FragColor = vec4(ambientColor + diffuseColor + specularColor, 1.0);
+}
+
+
+float computeAttenuation(vec3 att, float distVal)
+{
+    // f_att = min(\frac{1}{c_1 + c_2{\times}d_L + c_3{\times}d^2_{L}} , 1)
+    float distSqr = distVal * distVal;
+    float att1 = distVal * att.y;
+    float att2 = distSqr * att.z;
+    float result = att.x + att2 + att1;
+    result = 1 / result;
+    return min(result, 1);
+}
+
+float computeDiffColorPerChannel(vec3 normal, vec3 lightDir, float intensity)
+{
+    // transform vector to range [-1,1]
+    normal = normalize((normal * 2.0) - 1.0);
+    float costheta = dot(lightDir, normal);
+    costheta = max(costheta, 0.0);
+    return costheta * intensity;
+}
+vec3 computeDiffColor(vec3 normal1, vec3 normal2, vec3 normal3, vec3 lightDir,
+                      vec3 color)
+{
+    vec3 diffuseColor = vec3(1.0);
+    diffuseColor.x = computeDiffColorPerChannel(normal1, lightDir, color.x);
+    diffuseColor.y = computeDiffColorPerChannel(normal2, lightDir, color.y);
+    diffuseColor.z = computeDiffColorPerChannel(normal3, lightDir, color.z);
+    return diffuseColor;
+}
+
+float computeSpecColorPerChannel(vec3 normal, vec3 dirVec,
+                                 float shininess, float intensity)
+{
+    normal = normalize((normal * 2.0) - 1.0);
+    float specAngle = dot(normal, dirVec);
+    specAngle = max(specAngle, 0.0);
+    specAngle = pow(specAngle, shininess);
+    return specAngle * intensity;
+}
+vec3 computeSpecColor(vec3 normal1, vec3 normal2, vec3 normal3, vec3 dirVec,
+                      float shininess, vec3 color)
+{
+    vec3 specularColor = vec3(1.0);
+    specularColor.x = computeSpecColorPerChannel(normal1, dirVec,
+                                                 shininess, lightColor.x);
+    specularColor.y = computeSpecColorPerChannel(normal2, dirVec,
+                                                 shininess, lightColor.y);
+    specularColor.z = computeSpecColorPerChannel(normal3, dirVec,
+                                                 shininess, lightColor.z);
+    return specularColor;
+}
+"""
+
 
 lampVshader = """
 #version 330 core
@@ -539,8 +1139,6 @@ vec3 computeDiffuseColor(float c0r, float c1r,
     computeDiffuseColorPerChannel(c0b, c1b, c2b, c3b, c4b, c5b, LuB, LvB)
     );
 }
-
-
 """
 
 rgbptmFshader = """
@@ -572,7 +1170,7 @@ uniform vec3 ambientCoeffs;
 
 uniform bool blinn;
 
-float computeAttenuation(float attC1, float attC2, float attC3, float distVal);
+float computeAttenuation(vec3 atten, float distVal);
 
 float computeFragColorPerChannel(vec3 surfaceNormal, float attc1,
                                 float attc2, float attc3,
@@ -589,22 +1187,14 @@ float computeFragColorPerChannel(vec3 surfaceNormal, float attc1,
 
 void main()
 {
-        vec3 diffuseColor = computeDiffuseColor(coeff1r, coeff2r, coeff3r, 
-                                            coeff4r, coeff5r, coeff6r, 
-                                            coeff1g, coeff2g, coeff3g, 
-                                            coeff4g, coeff5g, coeff6g,
-                                            coeff1b, coeff2b, coeff3b,
-                                            coeff4b, coeff5b, coeff6b);
 
     float redC = computeFragColorPerChannel(
-                    surfaceNormalR,
-                    attc.x,
-                    attc.y, attc.z,
-                    diffuseColor.x,
+                    NormalR,
+                    attc, DiffColor.x,
                     diffuseCoeffs.x,
                     ambientCoeffs.x,
                     lightColor.x,  // ambient channel intensity
-                    diffuseColor.x,  // specular channel intensity
+                    DiffColor.x,  // specular channel intensity
                     specularCoeffs.x,
                     lightColor.x,
                     shininess,
@@ -613,14 +1203,13 @@ void main()
                     lightPos,
                     blinn);
     float greenC = computeFragColorPerChannel(
-                    surfaceNormalG,
-                    attc.x,
-                    attc.y, attc.z,
-                    diffuseColor.y,
+                    NormalG,
+                    attc,
+                    DiffColor.y,
                     diffuseCoeffs.y,
                     ambientCoeffs.y,
                     lightColor.y,  // ambient channel intensity
-                    diffuseColor.y,  // specular channel intensity
+                    DiffColor.y,  // specular channel intensity
                     specularCoeffs.y,
                     lightColor.y,  // light channel intensity
                     shininess,
@@ -629,14 +1218,13 @@ void main()
                     lightPos,
                     blinn);
     float blueC = computeFragColorPerChannel(
-                    surfaceNormalB,
-                    attc.x,
-                    attc.y, attc.z,
-                    diffuseColor.z,
+                    NormalB,
+                    attc,
+                    DiffColor.z,
                     diffuseCoeffs.z,
                     ambientCoeffs.z,
                     lightColor.z,  // ambient channel intensity
-                    diffuseColor.z,  // specular channel intensity
+                    DiffColor.z,  // specular channel intensity
                     specularCoeffs.z,
                     lightColor.z,  // light channel intensity
                     shininess,
@@ -647,19 +1235,18 @@ void main()
     FragColor = vec4(redC, greenC, blueC, 1.0);
 }
 
-float computeAttenuation(float attC1, float attC2, float attC3, float dist)
+float computeAttenuation(vec3 att, float distVal)
 {
     // f_att = min(\frac{1}{c_1 + c_2{\times}d_L + c_3{\times}d^2_{L}} , 1)
-    float distSqr = dist * dist;
-    float att1 = dist * attC2;
-    float att2 = distSqr * attC3;
-    float result = attC1 + att2 + att1;
+    float distSqr = distVal * distVal;
+    float att1 = distVal * att.y;
+    float att2 = distSqr * att.z;
+    float result = att.x + att2 + att1;
     result = 1 / result;
     return min(result, 1);
 }
 
-float computeFragColorPerChannel(vec3 surfaceNormal, float attc1, 
-                                float attc2, float attc3,
+float computeFragColorPerChannel(vec3 surfaceNormal, vec3 attc,
                                 float objDiffuseChannelIntensity,
                                 float objDiffuseChannelCoeff,
                                 float ambientChannelCoeff,
@@ -676,8 +1263,8 @@ float computeFragColorPerChannel(vec3 surfaceNormal, float attc1,
     ambientTerm = ambientTerm * objDiffuseChannelIntensity;
 
     // attenuation
-    float dist = distance(lightPosition, fragPos);
-    float fattr = computeAttenuation(attc1, attc2, attc3, dist);
+    float distVal = length(lightPosition, fragPos);
+    float fattr = computeAttenuation(attc, distVal);
 
     // lambertian term
     vec3 snormal = normalize(surfaceNormal);
@@ -707,18 +1294,6 @@ float computeFragColorPerChannel(vec3 surfaceNormal, float attc1,
 """
 
 shaders = {
-    "quad": {
-        "fragment": quadFshader,
-        "vertex": quadVshader,
-        "attribute_info": {
-            "stride": None,
-            "aPos": {"layout": 0, "size": 3, "offset": 0},
-            "aNormal": {"layout": 1, "size": 3, "offset": 3},
-            "aTexCoord": {"layout": 2, "size": 2, "offset": 6},
-            "aTangent": {"layout": 3, "size": 3, "offset": 8},
-            "aBiTangent": {"layout": 4, "size": 3, "offset": 11},
-        },
-    },
     "lambert": {
         "fragment": lambertFshader,
         "vertex": lambertVshader,
@@ -729,9 +1304,33 @@ shaders = {
             "aTexCoord": {"layout": 2, "size": 2, "offset": 6},
         },
     },
-    "quadPerChannel": {
-        "fragment": quadFshaderPerChannel,
-        "vertex": quadVshader,
+    "quadDir": {
+        "fragment": quadFshaderDir,
+        "vertex": quadVshaderDir,
+        "attribute_info": {
+            "stride": None,
+            "aPos": {"layout": 0, "size": 3, "offset": 0},
+            "aNormal": {"layout": 1, "size": 3, "offset": 3},
+            "aTexCoord": {"layout": 2, "size": 2, "offset": 6},
+            "aTangent": {"layout": 3, "size": 3, "offset": 8},
+            "aBiTangent": {"layout": 4, "size": 3, "offset": 11},
+        },
+    },
+    "quadPoint": {
+        "fragment": quadFshaderPoint,
+        "vertex": quadVshaderPoint,
+        "attribute_info": {
+            "stride": None,
+            "aPos": {"layout": 0, "size": 3, "offset": 0},
+            "aNormal": {"layout": 1, "size": 3, "offset": 3},
+            "aTexCoord": {"layout": 2, "size": 2, "offset": 6},
+            "aTangent": {"layout": 3, "size": 3, "offset": 8},
+            "aBiTangent": {"layout": 4, "size": 3, "offset": 11},
+        },
+    },
+    "quadSpot": {
+        "fragment": quadFshaderSpot,
+        "vertex": quadVshaderSpot,
         "attribute_info": {
             "stride": None,
             "aPos": {"layout": 0, "size": 3, "offset": 0},

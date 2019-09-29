@@ -86,8 +86,9 @@ class AppWindowFinal(AppWindowInit):
         self.availableGlWidgets = {
             "Lambertian": PtmLambertianGLWidget,
             "SingleNormalMap": PtmNormalMapGLWidget,
-            "PerChannelNormalMap": PtmPerChannelNormalMapGLWidget,
-            "CoefficientShader": PtmCoefficientShader,
+            "PerChannelNormalMapDir": PtmPerChannelNormalMapGLWidget,
+            "PerChannelNormalMapPoint": PtmPerChannelNormalMapGLWidget,
+            "PerChannelNormalMapSpot": PtmPerChannelNormalMapGLWidget,
         }
         wnames = [k for k in self.availableGlWidgets.keys()]
         self.shaderCombo.addItems(wnames)
@@ -125,8 +126,12 @@ class AppWindowFinal(AppWindowInit):
             self.runLambertianPipeLine(glchoice, ptm)
         elif glchoice == "SingleNormalMap":
             self.runSingleNormalMapPipeLine(glchoice, ptm)
-        elif glchoice == "PerChannelNormalMap":
-            self.runPerChannelNormalMapPipeLine(glchoice, ptm)
+        elif glchoice == "PerChannelNormalMapDir":
+            self.runPerChannelNormalMapDirPipeLine(glchoice, ptm)
+        elif glchoice == "PerChannelNormalMapPoint":
+            self.runPerChannelNormalMapPointPipeLine(glchoice, ptm)
+        elif glchoice == "PerChannelNormalMapSpot":
+            self.runPerChannelNormalMapSpotPipeLine(glchoice, ptm)
         elif glchoice == "CoefficientShader":
             self.runRGBCoeffShaderPipeline(glchoice, ptm)
 
@@ -147,13 +152,34 @@ class AppWindowFinal(AppWindowInit):
         glwidget = self.availableGlWidgets[glchoice](imqt, nmapqt)
         self.replaceViewerWidget(glwidget)
 
-    def runPerChannelNormalMapPipeLine(self, glchoice: str, ptm):
+    def runPerChannelNormalMapDirPipeLine(self, glchoice: str, ptm):
         "run per channel normal map pipeline"
         image = ptm.getImage()
         imqt = ImageQt.ImageQt(image)
         nmaps = ptm.getNormalMaps()
         nmaps = [ImageQt.ImageQt(nmap) for nmap in nmaps]
-        glwidget = self.availableGlWidgets[glchoice](imqt, nmaps)
+        glwidget = self.availableGlWidgets[glchoice](imqt, nmaps,
+                                                     objectShaderName="quadDir")
+        self.replaceViewerWidget(glwidget)
+
+    def runPerChannelNormalMapPointPipeLine(self, glchoice: str, ptm):
+        "run per channel normal map pipeline"
+        image = ptm.getImage()
+        imqt = ImageQt.ImageQt(image)
+        nmaps = ptm.getNormalMaps()
+        nmaps = [ImageQt.ImageQt(nmap) for nmap in nmaps]
+        glwidget = self.availableGlWidgets[glchoice](imqt, nmaps,
+                                                     objectShaderName="quadPoint")
+        self.replaceViewerWidget(glwidget)
+
+    def runPerChannelNormalMapSpotPipeLine(self, glchoice: str, ptm):
+        "run per channel normal map pipeline"
+        image = ptm.getImage()
+        imqt = ImageQt.ImageQt(image)
+        nmaps = ptm.getNormalMaps()
+        nmaps = [ImageQt.ImageQt(nmap) for nmap in nmaps]
+        glwidget = self.availableGlWidgets[glchoice](imqt, nmaps,
+                                                     objectShaderName="quadSpot")
         self.replaceViewerWidget(glwidget)
 
     def runRGBCoeffShaderPipeline(self, glchoice: str, ptm):
