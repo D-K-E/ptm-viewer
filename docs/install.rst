@@ -14,6 +14,9 @@ the installation is quite easy:
 
 - :code:`conda create --name ptmviewer --file ptmviewer-spec-file.txt`
 
+- Optional: If you do not want to use spec file you can use the yaml file to
+  create your environment :code:`conda env create -f ptmviewer.yml`
+
 - :code:`conda activate ptmviewer`
 
 - :code:`cd ptmviewer`

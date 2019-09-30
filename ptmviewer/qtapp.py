@@ -5,6 +5,7 @@
 from PySide2 import QtCore, QtGui, QtWidgets, QtOpenGL
 
 from PySide2.QtCore import QCoreApplication
+from PySide2.QtWidgets import QOpenGLWidget
 
 from PySide2.shiboken2 import VoidPtr
 
@@ -15,7 +16,9 @@ from PIL import Image, ImageQt
 
 from ptmviewer.interface.window import Ui_MainWindow
 from ptmviewer.glwidget import PtmLambertianGLWidget, PtmNormalMapGLWidget
-from ptmviewer.glwidget import PtmPerChannelNormalMapGLWidget
+from ptmviewer.glwidget import PtmPerChannelNormalMapDirGLWidget
+from ptmviewer.glwidget import PtmPerChannelNormalMapPointGLWidget
+from ptmviewer.glwidget import PtmPerChannelNormalMapSpotGLWidget
 from ptmviewer.glwidget import PtmCoefficientShader
 from ptmviewer.rgbptm import RGBPTM
 
@@ -86,9 +89,9 @@ class AppWindowFinal(AppWindowInit):
         self.availableGlWidgets = {
             "Lambertian": PtmLambertianGLWidget,
             "SingleNormalMap": PtmNormalMapGLWidget,
-            "PerChannelNormalMapDir": PtmPerChannelNormalMapGLWidget,
-            "PerChannelNormalMapPoint": PtmPerChannelNormalMapGLWidget,
-            "PerChannelNormalMapSpot": PtmPerChannelNormalMapGLWidget,
+            "PerChannelNormalMapDir": PtmPerChannelNormalMapDirGLWidget,
+            "PerChannelNormalMapPoint": PtmPerChannelNormalMapPointGLWidget,
+            "PerChannelNormalMapSpot": PtmPerChannelNormalMapSpotGLWidget,
         }
         wnames = [k for k in self.availableGlWidgets.keys()]
         self.shaderCombo.addItems(wnames)
@@ -99,6 +102,10 @@ class AppWindowFinal(AppWindowInit):
     # Ptm related stuff
     def loadPtm(self):
         "load ptm file into gl widget"
+        self.viewerWidget.close()
+        if isinstance(self.viewerWidget, PtmNormalMapGLWidget):
+            self.viewerWidget.cleanUpGL()
+            #
         citem = self.fileList.currentItem()
         cindex = self.fileList.indexFromItem(citem)
         ptmobj = self.ptmfiles[cindex]
@@ -158,8 +165,7 @@ class AppWindowFinal(AppWindowInit):
         imqt = ImageQt.ImageQt(image)
         nmaps = ptm.getNormalMaps()
         nmaps = [ImageQt.ImageQt(nmap) for nmap in nmaps]
-        glwidget = self.availableGlWidgets[glchoice](imqt, nmaps,
-                                                     objectShaderName="quadDir")
+        glwidget = self.availableGlWidgets[glchoice](imqt, nmaps)
         self.replaceViewerWidget(glwidget)
 
     def runPerChannelNormalMapPointPipeLine(self, glchoice: str, ptm):
@@ -168,8 +174,7 @@ class AppWindowFinal(AppWindowInit):
         imqt = ImageQt.ImageQt(image)
         nmaps = ptm.getNormalMaps()
         nmaps = [ImageQt.ImageQt(nmap) for nmap in nmaps]
-        glwidget = self.availableGlWidgets[glchoice](imqt, nmaps,
-                                                     objectShaderName="quadPoint")
+        glwidget = self.availableGlWidgets[glchoice](imqt, nmaps)
         self.replaceViewerWidget(glwidget)
 
     def runPerChannelNormalMapSpotPipeLine(self, glchoice: str, ptm):
@@ -178,8 +183,7 @@ class AppWindowFinal(AppWindowInit):
         imqt = ImageQt.ImageQt(image)
         nmaps = ptm.getNormalMaps()
         nmaps = [ImageQt.ImageQt(nmap) for nmap in nmaps]
-        glwidget = self.availableGlWidgets[glchoice](imqt, nmaps,
-                                                     objectShaderName="quadSpot")
+        glwidget = self.availableGlWidgets[glchoice](imqt, nmaps)
         self.replaceViewerWidget(glwidget)
 
     def runRGBCoeffShaderPipeline(self, glchoice: str, ptm):

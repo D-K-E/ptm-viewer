@@ -210,8 +210,16 @@ in vec3 TangentFragPos;
 in DLight {
     vec3 TangentLightDir;
     vec3 color;
-} light;
+} dlight;
 out vec4 FragColor;
+
+struct DirLightSource {
+
+    vec3 direction;
+    vec3 color;
+
+};
+
 
 struct PtmMaterial {
 
@@ -225,7 +233,13 @@ struct PtmMaterial {
 uniform PtmMaterial material;
 uniform vec3 ambient;
 
-float computeColorPerChannelDir(vec3 normal, vec3 lightDir, float intensity);
+float computeColorPerChannelDir(vec3 normal,
+                                float objIntensity,
+                                float ambientIntensity,
+                                float lightIntensity,
+                                float shininess,
+                                DirLightSource light,
+                                vec3 viewDir);
 
 void main(void)
 {
@@ -238,36 +252,45 @@ void main(void)
     normalg = normalize((normalg * 2.0) - 1.0);
     normalb = normalize((normalb * 2.0) - 1.0);
 
+    // make light
+    DirLightSource light;
+    light.direction = dlight.TangentLightDir;
+    light.color = dlight.color;
+
     // get diffuse color for object
     vec3 viewDirection = normalize(TangentViewPos - TangentFragPos);
     vec3 objColor = texture(material.diffuseMap, TexCoords).rgb;
     float red = computeColorPerChannelDir(normalr, objColor.x, ambient.x,
+                                          light.color.x,
                                        material.shininess, light,
                                        viewDirection);
     float green = computeColorPerChannelDir(normalg, objColor.y, ambient.y,
+                                          light.color.y,
                                        material.shininess, light,
                                        viewDirection);
     float blue = computeColorPerChannelDir(normalb, objColor.z, ambient.z,
+                                          light.color.z,
                                        material.shininess, light,
-                                       viewDirection)
+                                       viewDirection);
     FragColor = vec4(red, green, blue, 1.0);
 }
 
 float computeColorPerChannelDir(vec3 normal,
                              float objIntensity,
                              float ambientIntensity,
+                             float lightIntensity,
                              float shininess,
-                             DLight light,
+                             DirLightSource light,
                              vec3 viewDir)
 {
-    vec3 lightDir = normalize(-light.TangentLightDir);
+    vec3 lightDir = normalize(-light.direction);
     // costheta for direction
     float costheta = max(dot(normal, lightDir), 0.0);
     // specular
     vec3 reflectDir = reflect(-lightDir, normal);
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
-    float diffIntensity = light.color * costheta * objIntensity;
-    float specIntensity = light.color * spec * objIntensity;
+    float diffIntensity = lightIntensity * costheta * objIntensity;
+    float specIntensity = lightIntensity * spec * objIntensity;
     return (diffIntensity + ambientIntensity + specIntensity);
 }
 """
@@ -370,12 +393,13 @@ uniform PtmMaterial material;
 uniform vec3 ambient;
 uniform vec3 viewPos;
 
-float computeColorPerChannelPoint(vec3 normal, float intensity,
+float computeColorPerChannelPoint(vec3 normal,
+                                  float objIntensity,
                                   float ambientIntensity,
                                   float lightIntensity,
                                   float shininess,
                                   PointLight light,
-                                  vec3 viewDir);
+                                  vec3 viewDir)
 float computeAttenuation(vec3 att, float distVal);
 
 void main(void)
@@ -539,6 +563,17 @@ in SLight {
     float outerCutOff;
 } spotLight;
 
+struct SpotLightSource {
+
+    vec3 position;
+    vec3 direction;
+    float cutOff;
+    float outerCutOff;
+    vec3 attenuation;
+    vec3 color;
+
+};
+
 out vec4 FragColor;
 
 struct PtmMaterial {
@@ -555,9 +590,13 @@ uniform PtmMaterial material;
 uniform vec3 ambient;
 uniform vec3 viewPos;
 
-float computeColorPerChannelSpot(vec3 normal, vec3 lightDir, vec3 viewDir,
-                                  SLight light, float intensity,
-                                  float ambientIntensity);
+float computeColorPerChannelSpot(vec3 normal,
+                                 float objIntensity,
+                                 float ambientIntensity,
+                                 float lightIntensity,
+                                 float shininess,
+                                 SpotLightSource light,
+                                 vec3 viewDir);
 float computeAttenuation(vec3 att, float distVal);
 
 void main(void)
@@ -571,37 +610,50 @@ void main(void)
     normalg = normalize((normalg * 2.0) - 1.0);
     normalb = normalize((normalb * 2.0) - 1.0);
 
+    // spot light 
+    SpotLightSource light;
+    light.position = spotLight.TangentLightPos;
+    light.direction = spotLight.TangentLightDir;
+    light.color = spotLight.color;
+    light.attenuation = spotLight.attenuation;
+    light.cutOff = spotLight.cutOff;
+    light.outerCutOff = spotLight.outerCutOff;
+
     // get diffuse color for object
     vec3 viewDirection = normalize(TangentViewPos - TangentFragPos);
     vec3 objColor = texture(material.diffuseMap, TexCoords).rgb;
 
     float red = computeColorPerChannelSpot(normalr, objColor.x, ambient.x,
-                                       material.shininess, spotLight,
+                                            light.color.x,
+                                       material.shininess, light,
                                        viewDirection);
     float green = computeColorPerChannelSpot(normalg, objColor.y, ambient.y,
-                                       material.shininess, spotLight,
+                                            light.color.y,
+                                       material.shininess, light,
                                        viewDirection);
     float blue = computeColorPerChannelSpot(normalb, objColor.z, ambient.z,
-                                       material.shininess, spotLight,
-                                       viewDirection)
+                                            light.color.z,
+                                       material.shininess, light,
+                                       viewDirection);
     FragColor = vec4(red, green, blue, 1.0);
 }
 
 float computeColorPerChannelSpot(vec3 normal,
                                  float objIntensity,
                                  float ambientIntensity,
+                                 float lightIntensity,
                                  float shininess,
-                                 SLight light,
+                                 SpotLightSource light,
                                  vec3 viewDir)
 {
-    vec3 lightDir = normalize(light.TangentLightPos - TangentFragPos);
+    vec3 lightDir = normalize(light.position - TangentFragPos);
 
     // compute distance and attenuation
-    float distVal = length(light.TangentLightPos - TangentFragPos);
+    float distVal = length(light.position - TangentFragPos);
     float atten = computeAttenuation(light.attenuation, distVal);
 
     // spotlight intensity
-    float theta = dot(lightDir, normalize(-light.TangentLightDir));
+    float theta = dot(lightDir, normalize(-light.direction));
     float epsilon = light.cutOff - light.outerCutOff;
     float intens = clamp((theta - light.outerCutOff) / epsilon, 0.0, 1.0);
 
@@ -611,12 +663,11 @@ float computeColorPerChannelSpot(vec3 normal,
     vec3 reflectDir = reflect(-lightDir, normal);
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
     //
-    float diffIntensity = light.color * costheta * objIntensity;
-    float specIntensity = light.color * spec * objIntensity;
+    float diffIntensity = lightIntensity * costheta * objIntensity;
+    float specIntensity = lightIntensity * spec * objIntensity;
     diffIntensity = diffIntensity * atten * intens;
     specIntensity = specIntensity * atten * intens;
     return (diffIntensity + specIntensity + ambientIntensity);
-
 }
 float computeAttenuation(vec3 att, float distVal)
 {

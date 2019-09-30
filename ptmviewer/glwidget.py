@@ -450,6 +450,8 @@ class AbstractPointLightPtmGLWidget(AbstractGLWidgetHelper):
         self.lampProgram = None
         self.vbo.destroy()
         self.lampVbo.destroy()
+        self.lampVao.destroy()
+        self.vao.destroy()
         [tdict["texture"].destroy() for tdict in self.textures]
         self.doneCurrent()
 
@@ -902,8 +904,8 @@ class PtmPerChannelNormalMapGLWidget(PtmNormalMapGLWidget):
     "implement per channel normal map shader with opengl widget"
 
     def __init__(self, ptmImage: QImage, normalMaps: Tuple[QImage],
-                 lampShaderName="lamp", objectShaderName="quadSpot",
-                 parent=None):
+                 objectShaderName: str,
+                 lampShaderName="lamp", parent=None):
         super().__init__(ptmImage=ptmImage, normalMap=normalMaps[0],
                          lampShaderName=lampShaderName,
                          objectShaderName=objectShaderName,
@@ -925,6 +927,22 @@ class PtmPerChannelNormalMapGLWidget(PtmNormalMapGLWidget):
 
     def setObjectShaderUniforms_proc(self):
         "set object shader uniforms"
+        raise NotImplemented
+
+
+class PtmPerChannelNormalMapDirGLWidget(PtmPerChannelNormalMapGLWidget):
+    "directional light normal mapping"
+
+    def __init__(self, ptmImage: QImage, normalMaps: Tuple[QImage],
+                 objectShaderName="quadDir",
+                 lampShaderName="lamp", parent=None):
+        super().__init__(ptmImage=ptmImage, normalMaps=normalMaps,
+                         lampShaderName=lampShaderName,
+                         objectShaderName=objectShaderName,
+                         parent=parent)
+
+    def setObjectShaderUniforms_proc(self):
+        "set object shader"
         projectionMatrix = QMatrix4x4()
         projectionMatrix.perspective(
             self.camera.zoom, self.width() / self.height(), 0.2, 100.0
@@ -937,21 +955,94 @@ class PtmPerChannelNormalMapGLWidget(PtmNormalMapGLWidget):
         self.program.setUniformValue("view", viewMatrix)
         self.program.setUniformValue("model", model)
         self.program.setUniformValue("viewPos", self.camera.position)
-        self.program.setUniformValue("light.position", self.lamp.position)
         self.program.setUniformValue("light.direction", self.lamp.direction)
-        self.program.setUniformValue("light.cutOff", self.lamp.cutOff)
-        self.program.setUniformValue("light.outerCutOff",
-                                     self.lamp.outerCutOff)
-        self.program.setUniformValue("light.attenuation",
-                                     self.lamp.attenuation)
         self.program.setUniformValue("light.color",
-                                     self.lamp.color)
+                                     color)
         self.program.setUniformValue("material.shininess",
                                      self.shininess)
         self.program.setUniformValue("ambient", QVector3D(self.ambientCoeff,
                                                           self.ambientCoeff,
-                                                          self.ambientCoeff)
-                                     )
+                                                          self.ambientCoeff))
+
+
+class PtmPerChannelNormalMapPointGLWidget(PtmPerChannelNormalMapGLWidget):
+    "directional light normal mapping"
+
+    def __init__(self, ptmImage: QImage, normalMaps: Tuple[QImage],
+                 objectShaderName="quadPoint",
+                 lampShaderName="lamp", parent=None):
+        super().__init__(ptmImage=ptmImage, normalMaps=normalMaps,
+                         lampShaderName=lampShaderName,
+                         objectShaderName=objectShaderName,
+                         parent=parent)
+
+    def setObjectShaderUniforms_proc(self):
+        "set object shader"
+        projectionMatrix = QMatrix4x4()
+        projectionMatrix.perspective(
+            self.camera.zoom, self.width() / self.height(), 0.2, 100.0
+        )
+        viewMatrix = self.camera.getViewMatrix()
+        model = QMatrix4x4()
+        color = self.lamp.color
+        pos = self.lamp.position
+        self.program.setUniformValue("projection", projectionMatrix)
+        self.program.setUniformValue("view", viewMatrix)
+        self.program.setUniformValue("model", model)
+        self.program.setUniformValue("viewPos", self.camera.position)
+        self.program.setUniformValue("light.position", pos)
+        self.program.setUniformValue("light.color",
+                                     color)
+        self.program.setUniformValue("light.attenuation",
+                                     self.lamp.attenuation)
+
+        self.program.setUniformValue("material.shininess",
+                                     self.shininess)
+        self.program.setUniformValue("ambient", QVector3D(self.ambientCoeff,
+                                                          self.ambientCoeff,
+                                                          self.ambientCoeff))
+
+
+class PtmPerChannelNormalMapSpotGLWidget(PtmPerChannelNormalMapGLWidget):
+    "directional light normal mapping"
+
+    def __init__(self, ptmImage: QImage, normalMaps: Tuple[QImage],
+                 objectShaderName="quadSpot",
+                 lampShaderName="lamp", parent=None):
+        super().__init__(ptmImage=ptmImage, normalMaps=normalMaps,
+                         lampShaderName=lampShaderName,
+                         objectShaderName=objectShaderName,
+                         parent=parent)
+
+    def setObjectShaderUniforms_proc(self):
+        "set object shader"
+        projectionMatrix = QMatrix4x4()
+        projectionMatrix.perspective(
+            self.camera.zoom, self.width() / self.height(), 0.2, 100.0
+        )
+        viewMatrix = self.camera.getViewMatrix()
+        model = QMatrix4x4()
+        color = self.lamp.color
+        pos = self.lamp.position
+        self.program.setUniformValue("projection", projectionMatrix)
+        self.program.setUniformValue("view", viewMatrix)
+        self.program.setUniformValue("model", model)
+        self.program.setUniformValue("viewPos", self.camera.position)
+        self.program.setUniformValue("light.position", pos)
+        self.program.setUniformValue("light.direction", self.lamp.direction)
+        self.program.setUniformValue("light.color",
+                                     color)
+        self.program.setUniformValue("light.attenuation",
+                                     self.lamp.attenuation)
+        self.program.setUniformValue("light.cutOff", self.lamp.cutOff)
+        self.program.setUniformValue("light.outerCutOff",
+                                     self.lamp.outerCutOff)
+
+        self.program.setUniformValue("material.shininess",
+                                     self.shininess)
+        self.program.setUniformValue("ambient", QVector3D(self.ambientCoeff,
+                                                          self.ambientCoeff,
+                                                          self.ambientCoeff))
 
 
 class PtmCoefficientShader(AbstractPointLightPtmGLWidget):
