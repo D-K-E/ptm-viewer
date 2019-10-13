@@ -990,12 +990,9 @@ class PtmPerChannelNormalMapPhongGLWidget(PtmNormalMapGLWidget):
         self.program.setUniformValue("light.cutOff", self.lamp.cutOff)
         self.program.setUniformValue("light.outerCutOff",
                                      self.lamp.outerCutOff)
-        print("change shinines and ambient")
-        print("shininess: ", self.shininess)
         self.program.setUniformValue("material.shininess",
                                      self.shininess)
         self.program.setUniformValue("ambientCoeff", self.ambientCoeff)
-        print("ambient: ", self.ambientCoeff)
 
 
 class PtmPerChannelNormalMapDirGLWidget(PtmPerChannelNormalMapGLWidget):
