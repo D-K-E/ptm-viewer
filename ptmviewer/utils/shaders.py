@@ -156,7 +156,7 @@ float computeColorPerChannelPhong(vec3 normal,
                                   bool blinn,
                                   vec3 viewDir)
 {
-    vec3 lightDir = normalize(light.position - f_pos);
+    vec3 lightDir = normalize(light.direction);
 
     // compute distance and attenuation
     float distVal = length(light.position - f_pos);
@@ -185,8 +185,8 @@ float computeColorPerChannelPhong(vec3 normal,
     //
     float diffIntensity = lightIntensity * costheta * objIntensity;
     float specIntensity = lightIntensity * spec * objIntensity;
-    diffIntensity = diffIntensity * atten * intens;
-    specIntensity = specIntensity * atten * intens;
+    diffIntensity = diffIntensity * atten;
+    specIntensity = specIntensity * atten;
     return (diffIntensity + specIntensity + ambientIntensity);
 }
 float computeAttenuation(vec3 att, float distVal)
