@@ -180,115 +180,115 @@ class AbstractPointLightPtmGLWidget(AbstractGLWidgetHelper):
         # fmt: off
         self.lampVertices = np.array(
             [  # first square for cube
-                -0.5,  # first corner
-                -0.5,
-                -0.5,
-                0.5,  # second corner
-                -0.5,
-                -0.5,
-                0.5,  # third corner
-                0.5,
-                -0.5,
-                0.5,  # fourth corner
-                0.5,
-                -0.5,
+                -0.05,  # first corner
+                -0.05,
+                -0.05,
+                0.05,  # second corner
+                -0.05,
+                -0.05,
+                0.05,  # third corner
+                0.05,
+                -0.05,
+                0.05,  # fourth corner
+                0.05,
+                -0.05,
                 # second square for cube
-                -0.5,
-                0.5,
-                -0.5,
-                -0.5,
-                -0.5,
-                -0.5,
-                -0.5,
-                -0.5,
-                0.5,
-                0.5,
-                -0.5,
-                0.5,
-                0.5,
-                0.5,
-                0.5,
-                0.5,
-                0.5,
-                0.5,
-                -0.5,
-                0.5,
-                0.5,
-                -0.5,
-                -0.5,
-                0.5,
-                -0.5,
-                0.5,
-                0.5,
-                -0.5,
-                0.5,
-                -0.5,
-                -0.5,
-                -0.5,
-                -0.5,
-                -0.5,
-                -0.5,
-                -0.5,
-                -0.5,
-                -0.5,
-                0.5,
-                -0.5,
-                0.5,
-                0.5,
-                0.5,
-                0.5,
-                0.5,
-                0.5,
-                0.5,
-                -0.5,
-                0.5,
-                -0.5,
-                -0.5,
-                0.5,
-                -0.5,
-                -0.5,
-                0.5,
-                -0.5,
-                0.5,
-                0.5,
-                0.5,
-                0.5,
-                -0.5,
-                -0.5,
-                -0.5,
-                0.5,
-                -0.5,
-                -0.5,
-                0.5,
-                -0.5,
-                0.5,
-                0.5,
-                -0.5,
-                0.5,
-                -0.5,
-                -0.5,
-                0.5,
-                -0.5,
-                -0.5,
-                -0.5,
-                -0.5,
-                0.5,
-                -0.5,
-                0.5,
-                0.5,
-                -0.5,
-                0.5,
-                0.5,
-                0.5,
-                0.5,
-                0.5,
-                0.5,
-                -0.5,
-                0.5,
-                0.5,
-                -0.5,
-                0.5,
-                -0.5,
+                -0.05,
+                0.05,
+                -0.05,
+                -0.05,
+                -0.05,
+                -0.05,
+                -0.05,
+                -0.05,
+                0.05,
+                0.05,
+                -0.05,
+                0.05,
+                0.05,
+                0.05,
+                0.05,
+                0.05,
+                0.05,
+                0.05,
+                -0.05,
+                0.05,
+                0.05,
+                -0.05,
+                -0.05,
+                0.05,
+                -0.05,
+                0.05,
+                0.05,
+                -0.05,
+                0.05,
+                -0.05,
+                -0.05,
+                -0.05,
+                -0.05,
+                -0.05,
+                -0.05,
+                -0.05,
+                -0.05,
+                -0.05,
+                0.05,
+                -0.05,
+                0.05,
+                0.05,
+                0.05,
+                0.05,
+                0.05,
+                0.05,
+                0.05,
+                -0.05,
+                0.05,
+                -0.05,
+                -0.05,
+                0.05,
+                -0.05,
+                -0.05,
+                0.05,
+                -0.05,
+                0.05,
+                0.05,
+                0.05,
+                0.05,
+                -0.05,
+                -0.05,
+                -0.05,
+                0.05,
+                -0.05,
+                -0.05,
+                0.05,
+                -0.05,
+                0.05,
+                0.05,
+                -0.05,
+                0.05,
+                -0.05,
+                -0.05,
+                0.05,
+                -0.05,
+                -0.05,
+                -0.05,
+                -0.05,
+                0.05,
+                -0.05,
+                0.05,
+                0.05,
+                -0.05,
+                0.05,
+                0.05,
+                0.05,
+                0.05,
+                0.05,
+                0.05,
+                -0.05,
+                0.05,
+                0.05,
+                -0.05,
+                0.05,
+                -0.05,
             ],
             dtype=ctypes.c_float,
         )
@@ -367,7 +367,7 @@ class AbstractPointLightPtmGLWidget(AbstractGLWidgetHelper):
         self.lamp.setIntensity(channel=channel, val=val)
         self.update()
 
-    def changeAmbientCoeffs(self, val: float):
+    def changeAmbientCoeff(self, val: float):
         self.ambientCoeff = val
         self.update()
 
@@ -639,7 +639,6 @@ class PtmLambertianGLWidget(AbstractPointLightPtmGLWidget):
         lampModel = QMatrix4x4()
         lampModel.translate(self.lamp.position)
         lampModel.rotate(self.rotationAngle, self.rotVectorLamp)
-        lampModel.scale(0.1)
         self.lampProgram.setUniformValue("projection", projectionMatrix)
         self.lampProgram.setUniformValue("view", viewMatrix)
         self.lampProgram.setUniformValue("model", lampModel)
@@ -928,6 +927,75 @@ class PtmPerChannelNormalMapGLWidget(PtmNormalMapGLWidget):
     def setObjectShaderUniforms_proc(self):
         "set object shader uniforms"
         raise NotImplemented
+
+
+class PtmPerChannelNormalMapPhongGLWidget(PtmNormalMapGLWidget):
+    "Implement per channel normal map phong shader with opengl widget"
+
+    def __init__(self, ptmImage: QImage, normalMaps: Tuple[QImage],
+                 objectShaderName="phong",
+                 lampShaderName="lamp", parent=None):
+        super().__init__(ptmImage=ptmImage, normalMap=normalMaps[0],
+                         lampShaderName=lampShaderName,
+                         objectShaderName=objectShaderName,
+                         parent=parent)
+        self.textures = [
+            {"texture": None, "unit": 0, "name": "material.diffuseMap",
+             "data": ptmImage.mirrored()}
+        ]
+        for i in range(len(normalMaps)):
+            nmap = normalMaps[i].mirrored()
+            self.textures.append({
+                "unit": i+1,
+                "data": nmap,
+                "name": "material.normalMap" + str(i),
+                "texture": None})
+        #
+        # fmt: off
+        self.vertices = np.array(
+            [
+                # position       # normal       # texture coordinates
+                0.7, 0.7, -2.0, 0.0, 0.0, -1.0, 1.0, 1.0,  # top right
+                0.7, -0.7, -2.0, 0.0, 0.0, -1.0, 1.0, 0.0,  # bottom right
+                -0.7, -0.7, -2.0, 0.0, 0.0, -1.0, 0.0, 0.0,  # bottom left
+
+                -0.7, 0.7, -2.0, 0.0, 0.0, -1.0, 0.0, 1.0,  # top left
+                0.7, 0.7, -2.0, 0.0, 0.0, -1.0, 1.0, 1.0,  # top right
+                -0.7, -0.7, -2.0, 0.0, 0.0, -1.0, 0.0, 0.0,  # bottom left
+            ],
+            dtype=ctypes.c_float,
+        )
+        # fmt: on
+
+    def setObjectShaderUniforms_proc(self):
+        "set object shader"
+        projectionMatrix = QMatrix4x4()
+        projectionMatrix.perspective(
+            self.camera.zoom, self.width() / self.height(), 0.2, 100.0
+        )
+        viewMatrix = self.camera.getViewMatrix()
+        model = QMatrix4x4()
+        color = self.lamp.color
+        pos = self.lamp.position
+        self.program.setUniformValue("projection", projectionMatrix)
+        self.program.setUniformValue("view", viewMatrix)
+        self.program.setUniformValue("model", model)
+        self.program.setUniformValue("viewerPosition", self.camera.position)
+        self.program.setUniformValue("light.position", pos)
+        self.program.setUniformValue("light.direction", self.lamp.direction)
+        self.program.setUniformValue("light.color",
+                                     color)
+        self.program.setUniformValue("light.attenuation",
+                                     self.lamp.attenuation)
+        self.program.setUniformValue("light.cutOff", self.lamp.cutOff)
+        self.program.setUniformValue("light.outerCutOff",
+                                     self.lamp.outerCutOff)
+        print("change shinines and ambient")
+        print("shininess: ", self.shininess)
+        self.program.setUniformValue("material.shininess",
+                                     self.shininess)
+        self.program.setUniformValue("ambientCoeff", self.ambientCoeff)
+        print("ambient: ", self.ambientCoeff)
 
 
 class PtmPerChannelNormalMapDirGLWidget(PtmPerChannelNormalMapGLWidget):

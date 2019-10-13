@@ -19,6 +19,7 @@ from ptmviewer.glwidget import PtmLambertianGLWidget, PtmNormalMapGLWidget
 from ptmviewer.glwidget import PtmPerChannelNormalMapDirGLWidget
 from ptmviewer.glwidget import PtmPerChannelNormalMapPointGLWidget
 from ptmviewer.glwidget import PtmPerChannelNormalMapSpotGLWidget
+from ptmviewer.glwidget import PtmPerChannelNormalMapPhongGLWidget
 from ptmviewer.glwidget import PtmCoefficientShader
 from ptmviewer.rgbptm import RGBPTM
 
@@ -84,11 +85,13 @@ class AppWindowFinal(AppWindowInit):
         # angle shininess, ambient coeff
         self.rotAngle.valueChanged.connect(self.setAngle)
         self.shinSpin.valueChanged.connect(self.setShininess)
+        self.ambientCoeff.valueChanged.connect(self.setAmbientCoeff)
 
         # viewer widget, opengl widgets with different shaders
         self.availableGlWidgets = {
             "Lambertian": PtmLambertianGLWidget,
             "SingleNormalMap": PtmNormalMapGLWidget,
+            "PerChannelPhong": PtmPerChannelNormalMapPhongGLWidget,
             "PerChannelNormalMapDir": PtmPerChannelNormalMapDirGLWidget,
             "PerChannelNormalMapPoint": PtmPerChannelNormalMapPointGLWidget,
             "PerChannelNormalMapSpot": PtmPerChannelNormalMapSpotGLWidget,
@@ -133,12 +136,14 @@ class AppWindowFinal(AppWindowInit):
             self.runLambertianPipeLine(glchoice, ptm)
         elif glchoice == "SingleNormalMap":
             self.runSingleNormalMapPipeLine(glchoice, ptm)
+        elif glchoice == "PerChannelPhong":
+            self.runPerChannelNormalMapsPipeline(glchoice, ptm)
         elif glchoice == "PerChannelNormalMapDir":
-            self.runPerChannelNormalMapDirPipeLine(glchoice, ptm)
+            self.runPerChannelNormalMapsPipeline(glchoice, ptm)
         elif glchoice == "PerChannelNormalMapPoint":
-            self.runPerChannelNormalMapPointPipeLine(glchoice, ptm)
+            self.runPerChannelNormalMapsPipeline(glchoice, ptm)
         elif glchoice == "PerChannelNormalMapSpot":
-            self.runPerChannelNormalMapSpotPipeLine(glchoice, ptm)
+            self.runPerChannelNormalMapsPipeline(glchoice, ptm)
         elif glchoice == "CoefficientShader":
             self.runRGBCoeffShaderPipeline(glchoice, ptm)
 
@@ -159,25 +164,7 @@ class AppWindowFinal(AppWindowInit):
         glwidget = self.availableGlWidgets[glchoice](imqt, nmapqt)
         self.replaceViewerWidget(glwidget)
 
-    def runPerChannelNormalMapDirPipeLine(self, glchoice: str, ptm):
-        "run per channel normal map pipeline"
-        image = ptm.getImage()
-        imqt = ImageQt.ImageQt(image)
-        nmaps = ptm.getNormalMaps()
-        nmaps = [ImageQt.ImageQt(nmap) for nmap in nmaps]
-        glwidget = self.availableGlWidgets[glchoice](imqt, nmaps)
-        self.replaceViewerWidget(glwidget)
-
-    def runPerChannelNormalMapPointPipeLine(self, glchoice: str, ptm):
-        "run per channel normal map pipeline"
-        image = ptm.getImage()
-        imqt = ImageQt.ImageQt(image)
-        nmaps = ptm.getNormalMaps()
-        nmaps = [ImageQt.ImageQt(nmap) for nmap in nmaps]
-        glwidget = self.availableGlWidgets[glchoice](imqt, nmaps)
-        self.replaceViewerWidget(glwidget)
-
-    def runPerChannelNormalMapSpotPipeLine(self, glchoice: str, ptm):
+    def runPerChannelNormalMapsPipeline(self, glchoice: str, ptm):
         "run per channel normal map pipeline"
         image = ptm.getImage()
         imqt = ImageQt.ImageQt(image)
@@ -232,7 +219,8 @@ class AppWindowFinal(AppWindowInit):
     def setAmbientCoeff(self):
         "set ambient coefficient to gl widget"
         val = self.ambientCoeff.value()
-        self.viewerWidget.changeAmbientCoeffs(val)
+        print("ambient val")
+        self.viewerWidget.changeAmbientCoeff(val)
 
     def moveLightPosForward(self):
         ""

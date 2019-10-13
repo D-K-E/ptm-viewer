@@ -52,8 +52,9 @@ void main() {
 phongVshader = """
 #version 330 core
 
-layout (location = 0) in vec3 aPos;
-layout (location = 1) in vec3 aNormal;
+in vec3 aPos;
+in vec3 aNormal;
+in vec2 aTexCoord;
 
 uniform mat4 view;
 uniform mat4 model;
@@ -61,12 +62,14 @@ uniform mat4 projection;
 
 out vec3 FragPos;
 out vec3 Normal;
+out vec2 TexCoord;
 
-void main() 
+void main()
 {
-    gl_Position = projection * view * model * vec4(aPos, 1.0);
     FragPos = vec3(model * vec4(aPos, 1.0));
-    Normal = aNormal;
+    gl_Position = projection * view * model * vec4(FragPos, 1.0);
+    Normal = mat3(transpose(inverse(model))) * aNormal;
+    TexCoord = aTexCoord;
 }
 """
 
@@ -75,71 +78,124 @@ phongFshader = """
 
 in vec3 FragPos;
 in vec3 Normal;
+in vec2 TexCoord;
 
 out vec4 FragColor;
 
 uniform bool blinn;
 
-uniform vec3 lightPos;
-uniform float lightIntensity;
-uniform vec3 lightColor;
+struct SpotLightSource {
 
+    vec3 position;
+    vec3 direction;
+    float cutOff;
+    float outerCutOff;
+    vec3 attenuation;
+    vec3 color;
+
+};
+uniform SpotLightSource light;
 uniform vec3 viewerPosition;
-
-uniform vec3 ambientColor;
 uniform float ambientCoeff;
 
-uniform float specularCoeff;
-uniform vec3 specularColor;
+struct PtmMaterial {
+    sampler2D diffuseMap; // object colors per fragment
+    sampler2D normalMap1; // normals per vertex
+    sampler2D normalMap2; // normals per vertex
+    sampler2D normalMap3; // normals per vertex
+    float shininess;
+};
 
-uniform float diffuseCoeff;
-uniform vec3 diffuseColor;
+uniform PtmMaterial material;
 
-uniform float shininess;
-
-uniform float attC1;
-uniform float attC2;
-uniform float attC3;
+float computeColorPerChannelPhong(vec3 normal,
+                                  vec3 f_pos,
+                                  float objIntensity,
+                                  float ambientIntensity,
+                                  float lightIntensity,
+                                  float shininess,
+                                  SpotLightSource light,
+                                  bool blinn,
+                                  vec3 viewDir);
+float computeAttenuation(vec3 att, float distVal);
 
 void main() {
-    // ambient term I_a × k_a × O_d
-    vec3 ambientTerm = ambientColor * ambientCoeff * diffuseColor;
+    // obtain normal map from texture [0,1]
+    vec3 normalr = texture(material.normalMap1, TexCoord).rgb;
+    vec3 normalg = texture(material.normalMap2, TexCoord).rgb;
+    vec3 normalb = texture(material.normalMap3, TexCoord).rgb;
+    // transform vector to range [-1,1]
+    normalr = normalize((normalr * 2.0) - 1.0);
+    normalg = normalize((normalg * 2.0) - 1.0);
+    normalb = normalize((normalb * 2.0) - 1.0);
+    vec3 objColor = texture(material.diffuseMap, TexCoord).rgb;
+    vec3 viewDirection = normalize(viewerPosition - FragPos);
+    float red = computeColorPerChannelPhong(normalr, FragPos, objColor.x,
+                                            ambientCoeff, light.color.x,
+                                            material.shininess,
+                                            light, blinn, viewDirection);
+    float green = computeColorPerChannelPhong(normalg, FragPos, objColor.y,
+                                              ambientCoeff, light.color.y,
+                                              material.shininess,
+                                              light, blinn, viewDirection);
+    float blue = computeColorPerChannelPhong(normalg, FragPos, objColor.z,
+                                             ambientCoeff, light.color.z,
+                                             material.shininess,
+                                             light, blinn, viewDirection);
+    FragColor = vec4(red, green, blue, 1.0);
+}
+float computeColorPerChannelPhong(vec3 normal,
+                                  vec3 f_pos,
+                                  float objIntensity,
+                                  float ambientIntensity,
+                                  float lightIntensity,
+                                  float shininess,
+                                  SpotLightSource light,
+                                  bool blinn,
+                                  vec3 viewDir)
+{
+    vec3 lightDir = normalize(light.position - f_pos);
 
-    // lambertian terms k_d * (N \cdot L) * I_p
-    vec3 surfaceNormal = normalize(Normal);
-    vec3 lightDirection = normalize(lightPos - FragPos);
-    float costheta = dot(lightDirection, surfaceNormal);
-    vec3 lambertianTerm = costheta * diffuseCoeff * lightIntensity * lightColor;
+    // compute distance and attenuation
+    float distVal = length(light.position - f_pos);
+    float atten = computeAttenuation(light.attenuation, distVal);
 
-    // attenuation term f_att
-    // f_att = min(\frac{1}{c_1 + c_2{\times}d_L + c_3{\times}d^2_{L}} , 1)
-    float dist = distance(lightPos, FragPos);
-    float distSqr = dist * dist;
-    float att1 = dist * attC2;
-    float att2 = distSqr * attC3;
-    float result = attC1 + att2 + att1;
-    result = 1 / result;
-    float attenuation = min(result, 1);
+    // spotlight intensity
+    float theta = dot(lightDir, normalize(-light.direction));
+    float epsilon = light.cutOff - light.outerCutOff;
+    float intens = clamp((theta - light.outerCutOff) / epsilon, 0.0, 1.0);
 
-    // expanding lambertian to phong
-    vec3 phongTerms = lambertianTerm * attenuation;
-    vec3 phong1 = phongTerms * diffuseColor;
-
-    // phong adding specular terms
-    vec3 phong2 = specularColor * specularCoeff;
-
-    vec3 viewerDirection = normalize(viewerPosition - FragPos);
+    // costheta for direction
+    float costheta = max(dot(normal, lightDir), 0.0);
+    // specular
     float specAngle = 0.0;
-    if(blinn) {
-        vec3 halfwayDirection = normalize(lightDirection + viewerDirection);
-        specAngle = max(dot(surfaceNormal, halfwayDirection), 0);
-    }else{
-        vec3 reflectionDirection = reflect(-lightDirection, surfaceNormal);
-        specAngle = max(dot(viewerDirection, reflectionDirection), 0);
+    if(blinn)
+    {
+        vec3 halfwayDir = normalize(lightDir + viewDir);
+        specAngle = max(dot(normal, halfwayDir), 0.0);
     }
-    float specular = pow(specAngle, shininess);
-    phong2 = phong2 * specular;
-    FragColor = vec4(phong1 + phong2 + ambientTerm, 1.0);
+    else
+    {
+       vec3 reflectDir = reflect(-lightDir, normal);
+       specAngle = max(dot(viewDir, reflectDir), 0.0);
+    }
+    float spec = pow(specAngle, shininess);
+    //
+    float diffIntensity = lightIntensity * costheta * objIntensity;
+    float specIntensity = lightIntensity * spec * objIntensity;
+    diffIntensity = diffIntensity * atten * intens;
+    specIntensity = specIntensity * atten * intens;
+    return (diffIntensity + specIntensity + ambientIntensity);
+}
+float computeAttenuation(vec3 att, float distVal)
+{
+    // f_att = min(\frac{1}{c_1 + c_2{\times}d_L + c_3{\times}d^2_{L}} , 1)
+    float distSqr = distVal * distVal;
+    float att1 = distVal * att.y;
+    float att2 = distSqr * att.z;
+    float result = att.x + att2 + att1;
+    result = 1 / result;
+    return min(result, 1.0);
 }
 """
 quadVshaderDir = """
@@ -399,7 +455,7 @@ float computeColorPerChannelPoint(vec3 normal,
                                   float lightIntensity,
                                   float shininess,
                                   PointLight light,
-                                  vec3 viewDir)
+                                  vec3 viewDir);
 float computeAttenuation(vec3 att, float distVal);
 
 void main(void)
@@ -1044,7 +1100,7 @@ uniform lowp vec3 lightColor;
 
 void main()
 {
-    FragColor = vec4(lightColor, 1.0);
+    FragColor = vec4(lightColor, 0.1);
 }
 """
 
@@ -1348,6 +1404,16 @@ shaders = {
     "lambert": {
         "fragment": lambertFshader,
         "vertex": lambertVshader,
+        "attribute_info": {
+            "stride": None,
+            "aPos": {"layout": 0, "size": 3, "offset": 0},
+            "aNormal": {"layout": 1, "size": 3, "offset": 3},
+            "aTexCoord": {"layout": 2, "size": 2, "offset": 6},
+        },
+    },
+    "phong": {
+        "fragment": phongFshader,
+        "vertex": phongVshader,
         "attribute_info": {
             "stride": None,
             "aPos": {"layout": 0, "size": 3, "offset": 0},
