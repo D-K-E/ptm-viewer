@@ -35,7 +35,7 @@ Roadmap
 Milestone 0.1.0
 -------------
 
-- Smoother UI with dock widgets
+- Smoother UI with dock widgets [X]
 
 - Reproducible lightening conditions using lightning parameter serialization
 
@@ -44,6 +44,7 @@ Milestone 0.1.0
 - Handle light and camera movement in all axes.
 
 - Small notepad for taking notes about the object as it is seen by the user.
+  [X]
 
 
 Milestone 0.2.0

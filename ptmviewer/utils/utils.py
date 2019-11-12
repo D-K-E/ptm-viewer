@@ -308,11 +308,12 @@ def arr2qmat(arr: np.ndarray):
 def move3dObjPure(
     direction: str,
     positionVector: Tuple[float, float, float],
-    axvec1: Tuple[float, float, float],
-    axvec2: Tuple[float, float, float],
+    xaxis: Tuple[float, float, float],
+    yaxis: Tuple[float, float, float],
+    zaxis: Tuple[float, float, float],
     deltaTime: float,
     speed: float,
-    availableMoves=["forward", "backward", "left", "right"],
+    availableMoves=["+z", "-z", "-x", "+x", "+y", "-y"],
 ):
     ""
     velocity = speed * deltaTime
@@ -323,29 +324,37 @@ def move3dObjPure(
                 direction, availableMoves
             )
         )
-    if direction == "forward":
-        multip = scalar2vecMult(axvec1, velocity)
+    if direction == "+z":
+        multip = scalar2vecMult(zaxis, velocity)
         positionVector = vec2vecAdd(positionVector, multip)
-    elif direction == "backward":
-        multip = scalar2vecMult(axvec1, velocity)
+    elif direction == "-z":
+        multip = scalar2vecMult(zaxis, velocity)
         positionVector = vec2vecSubs(positionVector, multip)
-    elif direction == "right":
-        multip = scalar2vecMult(axvec2, velocity)
+    elif direction == "+x":
+        multip = scalar2vecMult(xaxis, velocity)
         positionVector = vec2vecAdd(positionVector, multip)
-    elif direction == "left":
-        multip = scalar2vecMult(axvec2, velocity)
+    elif direction == "-x":
+        multip = scalar2vecMult(xaxis, velocity)
         positionVector = vec2vecSubs(positionVector, multip)
+    elif direction == "+y":
+        multip = scalar2vecMult(yaxis, velocity)
+        positionVector = vec2vecAdd(positionVector, multip)
+    elif direction == "-y":
+        multip = scalar2vecMult(yaxis, velocity)
+        positionVector = vec2vecSubs(positionVector, multip)
+
     return positionVector
 
 
 def move3dObjQt(
     direction: str,
     positionVector: QVector3D,
-    axvec1: QVector3D,
-    axvec2: QVector3D,
+    xaxis: QVector3D,
+    yaxis: QVector3D,
+    zaxis: QVector3D,
     deltaTime: float,
     speed: float,
-    availableMoves=["forward", "backward", "left", "right"],
+    availableMoves=["+x", "-x", "+y", "-y", "+z", "-z"],
 ):
     ""
     velocity = speed * deltaTime
@@ -356,15 +365,18 @@ def move3dObjQt(
                 direction, availableMoves
             )
         )
-    if direction == "forward":
-        positionVector += axvec1 * velocity
-    elif direction == "backward":
-        positionVector -= axvec1 * velocity
-    elif direction == "right":
-        positionVector += axvec2 * velocity
-    elif direction == "left":
-        positionVector -= axvec2 * velocity
-
+    if direction == "+x":
+        positionVector += xaxis * velocity
+    elif direction == "-x":
+        positionVector -= xaxis * velocity
+    elif direction == "+y":
+        positionVector += yaxis * velocity
+    elif direction == "-y":
+        positionVector -= yaxis * velocity
+    elif direction == "+z":
+        positionVector += zaxis * velocity
+    elif direction == "-z":
+        positionVector -= zaxis * velocity
     return positionVector
 
 

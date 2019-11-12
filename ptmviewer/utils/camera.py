@@ -37,10 +37,7 @@ class PureCamera:
         self.movementSensitivity = 0.001
         self.movementSpeed = 2.5
         self.zoom = 45.0
-        self.availableMoves = ["forward",
-                               "backward",
-                               "left",
-                               "right"]
+        self.availableMoves = ["+z", "-z", "+x", "-x", "+y", "-y"]
 
         # update camera vectors
         self.updateCameraVectors()
@@ -56,28 +53,24 @@ class PureCamera:
         frontZ = math.sin(yawRadian) * pitchCos
         self.front = (frontX, frontY, frontZ)
         self.front = normalize_tuple(self.front)
-        self.right = crossProduct(
-            self.front,
-            self.worldUp)
+        self.right = crossProduct(self.front, self.worldUp)
         self.right = normalize_tuple(self.right)
-        self.up = crossProduct(
-            self.right,
-            self.front)
+        self.up = crossProduct(self.right, self.front)
         self.up = normalize_tuple(self.up)
 
     def move(self, direction: str, deltaTime: float):
         ""
-        self.position = move3dObjPure(direction=direction,
-                                      deltaTime=deltaTime,
-                                      positionVector=self.position,
-                                      axvec1=self.front,
-                                      axvec2=self.right,
-                                      availableMoves=self.availableMoves)
+        self.position = move3dObjPure(
+            direction=direction,
+            deltaTime=deltaTime,
+            positionVector=self.position,
+            axvec1=self.front,
+            axvec2=self.right,
+            axvec3=self.up,
+            availableMoves=self.availableMoves,
+        )
 
-    def lookAround(self,
-                   xoffset: float,
-                   yoffset: float,
-                   pitchBound: bool):
+    def lookAround(self, xoffset: float, yoffset: float, pitchBound: bool):
         "Look around with camera"
         xoffset *= self.movementSensitivity
         yoffset *= self.movementSensitivity
@@ -92,8 +85,7 @@ class PureCamera:
         #
         self.updateCameraVectors()
 
-    def zoomInOut(self, yoffset: float,
-                  zoomBound=45.0):
+    def zoomInOut(self, yoffset: float, zoomBound=45.0):
         "Zoom with camera"
         if self.zoom >= 1.0 and self.zoom <= zoomBound:
             self.zoom -= yoffset
@@ -102,15 +94,17 @@ class PureCamera:
         elif self.zoom >= zoomBound:
             self.zoom = zoomBound
 
-    def setCameraWithVectors(self,
-                             position: tuple,
-                             up: tuple,
-                             front: tuple,
-                             yaw: float,
-                             pitch: float,
-                             zoom: float,
-                             speed: float,
-                             sensitivity: float):
+    def setCameraWithVectors(
+        self,
+        position: tuple,
+        up: tuple,
+        front: tuple,
+        yaw: float,
+        pitch: float,
+        zoom: float,
+        speed: float,
+        sensitivity: float,
+    ):
         "Set camera"
         assert len(position) == len(up)
         assert len(up) == len(front)
@@ -125,19 +119,21 @@ class PureCamera:
         self.zoom = zoom
         self.updateCameraVectors()
 
-    def setCameraWithFloatVals(self,
-                               posx: float,
-                               posy: float,
-                               posz: float,
-                               upx: float,
-                               upy: float,
-                               upz: float,
-                               yaw: float,
-                               pitch: float,
-                               speed: float,
-                               sensitivity: float,
-                               zoom: float,
-                               front: tuple):
+    def setCameraWithFloatVals(
+        self,
+        posx: float,
+        posy: float,
+        posz: float,
+        upx: float,
+        upy: float,
+        upz: float,
+        yaw: float,
+        pitch: float,
+        speed: float,
+        sensitivity: float,
+        zoom: float,
+        front: tuple,
+    ):
         "Set camera floats"
         assert len(front) == 3
         self.position = (posx, posy, posz)
@@ -154,17 +150,17 @@ class PureCamera:
         "Obtain view matrix for camera"
         return computeLookAtPure(
             pos=self.position,
-            target=vec2vecAdd(self.position,
-                              self.front),
-            worldUp=self.worldUp
+            target=vec2vecAdd(self.position, self.front),
+            worldUp=self.worldUp,
         )
+
     def __str__(self):
         "string representation"
         mess = "Camera: position {0},\n yaw: {1},\n pitch: {2},\n world up:{3}"
-        mes = mess.format(str(self.position), str(self.yaw),
-                          str(self.pitch), str(self.worldUp)
-                          )
-        return  mes
+        mes = mess.format(
+            str(self.position), str(self.yaw), str(self.pitch), str(self.worldUp)
+        )
+        return mes
 
 
 class QtCamera:
@@ -172,7 +168,7 @@ class QtCamera:
 
     def __init__(self):
         ""
-        self.availableMoves = ["forward", "backward", "left", "right"]
+        self.availableMoves = ["+z", "-z", "+x", "-x", "+y", "-y"]
         # Camera attributes
         self.position = QVector3D(0.0, 0.0, 0.0)
         self.front = QVector3D(0.0, 0.0, -0.5)
@@ -200,13 +196,9 @@ class QtCamera:
         frontZ = np.sin(yawRadian) * pitchCos
         self.front = QVector3D(frontX, frontY, frontZ)
         self.front.normalize()
-        self.right = QVector3D.crossProduct(
-            self.front,
-            self.worldUp)
+        self.right = QVector3D.crossProduct(self.front, self.worldUp)
         self.right.normalize()
-        self.up = QVector3D.crossProduct(
-            self.right,
-            self.front)
+        self.up = QVector3D.crossProduct(self.right, self.front)
         self.up.normalize()
 
     def move(self, direction: str, deltaTime: float):
@@ -218,13 +210,10 @@ class QtCamera:
             positionVector=self.position,
             axvec1=self.front,
             axvec2=self.right,
-            availableMoves=self.availableMoves
+            availableMoves=self.availableMoves,
         )
 
-    def lookAround(self,
-                   xoffset: float,
-                   yoffset: float,
-                   pitchBound: bool):
+    def lookAround(self, xoffset: float, yoffset: float, pitchBound: bool):
         "Look around with camera"
         xoffset *= self.movementSensitivity
         yoffset *= self.movementSensitivity
@@ -239,8 +228,7 @@ class QtCamera:
         #
         self.updateCameraVectors()
 
-    def zoomInOut(self, yoffset: float,
-                  zoomBound=45.0):
+    def zoomInOut(self, yoffset: float, zoomBound=45.0):
         "Zoom with camera"
         if self.zoom >= 1.0 and self.zoom <= zoomBound:
             self.zoom -= yoffset
@@ -252,20 +240,19 @@ class QtCamera:
     def getViewMatrix(self):
         "Obtain view matrix for camera"
         view = QMatrix4x4()
-        view.lookAt(self.position,
-                    self.position+self.front,
-                    self.up
-                    )
+        view.lookAt(self.position, self.position + self.front, self.up)
         return view
 
-    def setCameraWithVectors(self,
-                             position=QVector3D(0.0, 0.0, 0.0),
-                             worldUp=QVector3D(0.0, 1.0, 0.0),
-                             yaw=-90.0,
-                             pitch=0.0,
-                             zoom=45.0,
-                             speed=2.5,
-                             sensitivity=0.00001):
+    def setCameraWithVectors(
+        self,
+        position=QVector3D(0.0, 0.0, 0.0),
+        worldUp=QVector3D(0.0, 1.0, 0.0),
+        yaw=-90.0,
+        pitch=0.0,
+        zoom=45.0,
+        speed=2.5,
+        sensitivity=0.00001,
+    ):
         "Set camera"
         self.position = position
         self.worldUp = worldUp
@@ -296,19 +283,20 @@ class QtCamera:
         self.yaw = yaw
         self.updateCameraVectors()
 
-    def setCameraWithFloatVals(self,
-                               posx=0.0,
-                               posy=0.0,
-                               posz=0.0,
-                               upx=0.0,
-                               upy=1.0,
-                               upz=0.0,
-                               yaw=-90.0,
-                               pitch=0.0,
-                               zoom=45.0,
-                               speed=2.5,
-                               sensitivity=0.00001,
-                               ):
+    def setCameraWithFloatVals(
+        self,
+        posx=0.0,
+        posy=0.0,
+        posz=0.0,
+        upx=0.0,
+        upy=1.0,
+        upz=0.0,
+        yaw=-90.0,
+        pitch=0.0,
+        zoom=45.0,
+        speed=2.5,
+        sensitivity=0.00001,
+    ):
         "Set camera floats"
         self.position = QVector3D(posx, posy, posz)
         self.worldUp = QVector3D(upx, upy, upz)
@@ -322,11 +310,10 @@ class QtCamera:
     def __str__(self):
         "string representation"
         mess = "Camera: position {0}, yaw: {1}, pitch: {2}, world up:{3}"
-        mes = mess.format(str(self.position), str(self.yaw),
-                          str(self.pitch), str(self.worldUp)
-                          )
-        return  mes
-
+        mes = mess.format(
+            str(self.position), str(self.yaw), str(self.pitch), str(self.worldUp)
+        )
+        return mes
 
 
 class FPSCameraQt(QtCamera):
