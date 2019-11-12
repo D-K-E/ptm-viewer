@@ -12,6 +12,8 @@ from PySide2.shiboken2 import VoidPtr
 import numpy as np
 import sys
 import os
+import json
+import pdb
 from PIL import Image, ImageQt
 
 from ptmviewer.interface.window import Ui_MainWindow
@@ -22,6 +24,7 @@ from ptmviewer.glwidget import PtmPerChannelNormalMapSpotGLWidget
 from ptmviewer.glwidget import PtmPerChannelNormalMapPhongGLWidget
 from ptmviewer.glwidget import PtmCoefficientShader
 from ptmviewer.rgbptm import RGBPTM
+from ptmviewer.utils.shaders import shaders
 
 
 class AppWindowInit(Ui_MainWindow):
@@ -33,7 +36,60 @@ class AppWindowInit(Ui_MainWindow):
     def __init__(self):
         self.main_window = QtWidgets.QMainWindow()
         super().setupUi(self.main_window)
-        pass
+
+        # adding basic defaults to here
+        # Main Window Events
+        self.main_window.setWindowTitle("Python PTM Viewer")
+        self.main_window.closeEvent = self.closeApp
+        self.closeShort = QtWidgets.QShortcut(
+            QtGui.QKeySequence("ctrl+w"), self.main_window
+        )
+        self.closeShort.activated.connect(self.closeKey)
+        # make menu
+        self.toolbar = self.main_window.addToolBar("Widgets")
+        self.createToolbar()
+
+    def prepDockWidget(self, txt: str, keyseq: str, dockWidget):
+        "prepare docker widget"
+        dockAct = dockWidget.toggleViewAction()
+        dockAct.setShortcut(QtGui.QKeySequence(keyseq))
+        dockAct.setText(txt)
+        dockAct.setToolTip(keyseq)
+        self.toolbar.addAction(dockAct)
+        return dockAct
+
+    def createToolbar(self):
+        "create tool bar"
+        self.fact = self.prepDockWidget(
+            txt="file list", keyseq="ctrl+f", dockWidget=self.fileListDock
+        )
+        # self.toolbar.addAction(self.fact)
+        self.cact = self.prepDockWidget(
+            txt="color controller", keyseq="ctrl+z", dockWidget=self.colorDock
+        )
+        # self.toolbar.addAction(self.cact)
+        self.ract = self.prepDockWidget(
+            txt="rotation controller", keyseq="ctrl+r", dockWidget=self.rotateDock
+        )
+        # self.toolbar.addAction(self.ract)
+        self.mact = self.prepDockWidget(
+            txt="move controller", keyseq="ctrl+m", dockWidget=self.moveDock
+        )
+        # self.toolbar.addAction(self.mact)
+        self.pact = self.prepDockWidget(
+            txt="parameter viewer", keyseq="ctrl+p", dockWidget=self.paramsDock
+        )
+
+        # self.toolbar.addAction(self.pact)
+        self.tact = self.prepDockWidget(
+            txt="transcriber", keyseq="ctrl+t", dockWidget=self.transcribeDock
+        )
+
+        # self.toolbar.addAction(self.tact)
+        self.gact = self.prepDockWidget(
+            txt="opengl info viewer", keyseq="ctrl+g", dockWidget=self.glInfoDock
+        )
+        # self.toolbar.addAction(self.gact)
 
 
 class AppWindowFinal(AppWindowInit):
@@ -43,15 +99,6 @@ class AppWindowFinal(AppWindowInit):
         super().__init__()
         self.ptmfiles = {}
 
-        # Main Window Events
-        self.main_window.setWindowTitle("Python PTM Viewer")
-        self.main_window.closeEvent = self.closeApp
-        self.closeShort = QtWidgets.QShortcut(
-            QtGui.QKeySequence("ctrl+w"), self.main_window
-        )
-        self.closeShort.activated.connect(self.closeKey)
-        # self.main_window.setShortcut("ctrl+w")
-
         # Button related events
         self.addFile.clicked.connect(self.browseFolder)
         self.addFile.setShortcut("ctrl+o")
@@ -59,33 +106,45 @@ class AppWindowFinal(AppWindowInit):
         self.loadFile.clicked.connect(self.loadPtm)
         self.loadFile.setShortcut("ctrl+l")
 
-        # lights
-        self.lightRed.valueChanged.connect(self.changeLightColor)
-        self.lightGreen.valueChanged.connect(self.changeLightColor)
-        self.lightBlue.valueChanged.connect(self.changeLightColor)
-        self.rotLightX.valueChanged.connect(self.rotateLights)
-        self.rotLightY.valueChanged.connect(self.rotateLights)
-        self.rotLightZ.valueChanged.connect(self.rotateLights)
-        self.lightMoveUp.clicked.connect(self.moveLightPosForward)
-        self.lightMoveDown.clicked.connect(self.moveLightPosBackward)
-        self.lightMoveLeft.clicked.connect(self.moveLightPosLeft)
-        self.lightMoveRight.clicked.connect(self.moveLightPosRight)
+        # dock widgets
 
-        # camera
-        self.rotCamX.valueChanged.connect(self.turnCameraX)
-        self.rotCamY.valueChanged.connect(self.turnCameraY)
-        self.camMoveUp.clicked.connect(self.moveCameraForward)
-        self.camMoveDown.clicked.connect(self.moveCameraBackward)
-        self.camMoveLeft.clicked.connect(self.moveCameraLeft)
-        self.camMoveRight.clicked.connect(self.moveCameraRight)
+        ## params widget
+        ### Available buttons
+        self.captureBtn.clicked.connect(self.captureParams)
 
-        self.lastCamXVal = self.rotCamX.value()
-        self.lastCamYVal = self.rotCamY.value()
+        ## transcribe widget
+        self.saveBtn.clicked.connect(lambda x: x)
 
-        # angle shininess, ambient coeff
-        self.rotAngle.valueChanged.connect(self.setAngle)
-        self.shinSpin.valueChanged.connect(self.setShininess)
-        self.ambientCoeff.valueChanged.connect(self.setAmbientCoeff)
+        ## move widget
+        ### Available buttons
+        self.moveCameraRBtn.toggled.connect(lambda x: x)
+        self.moveLightRBtn.toggled.connect(lambda x: x)
+        self.moveXCBox.stateChanged.connect(lambda x: x)
+        self.moveYCBox.stateChanged.connect(lambda x: x)
+        self.moveZCBox.stateChanged.connect(lambda x: x)
+        self.moveUp.clicked.connect(lambda x: x)
+        self.moveDown.clicked.connect(lambda x: x)
+        ## rotate widget
+        ### Available buttons
+        self.rotCamRBtn.toggled.connect(lambda x: x)
+        self.rotLightRBtn.toggled.connect(lambda x: x)
+        self.rotX.valueChanged.connect(lambda x: x)
+        self.rotY.valueChanged.connect(lambda x: x)
+        self.rotZ.valueChanged.connect(lambda x: x)
+        ## color widget
+        ### Available buttons
+        self.colorR.valueChanged.connect(lambda x: x)
+        self.colorG.valueChanged.connect(lambda x: x)
+        self.colorB.valueChanged.connect(lambda x: x)
+        self.rotAngle.valueChanged.connect(lambda x: x)
+        self.shinSpin.valueChanged.connect(lambda x: x)
+        self.ambientCoeff.valueChanged.connect(lambda x: x)
+        ## file list widget
+        ### Available buttons
+        self.addFile.clicked.connect(lambda x: x)
+        self.loadFile.clicked.connect(lambda x: x)
+        self.removeFile.clicked.connect(lambda x: x)
+        ## gl info widget
 
         # viewer widget, opengl widgets with different shaders
         self.availableGlWidgets = {
@@ -101,6 +160,15 @@ class AppWindowFinal(AppWindowInit):
         self.shaderCombo.setEditable(False)
         self.shaderCombo.setCurrentText(wnames[0])
         # self.shaderCombo.currentTextChanged.connect(self.loadPtm)
+        self.cleanViewWidget = QtWidgets.QWidget(self.main_window)
+        width = self.viewerWidget.width()
+        height = self.viewerWidget.height()
+        self.cleanViewWidget.resize(width, height)
+        #
+        maindir = os.curdir
+        ptmdir = os.path.join(maindir, "ptmviewer")
+        assetdir = os.path.join(ptmdir, "assets")
+        self.jsondir = os.path.join(assetdir, "jsons")
 
     # Ptm related stuff
     def loadPtm(self):
@@ -118,12 +186,8 @@ class AppWindowFinal(AppWindowInit):
         #
         self.runGlPipeline(glchoice, ptm)
         info = self.viewerWidget.getGLInfo()
-        self.statusbar.showMessage(info, 5000)
-        # info = self.viewerWidget.getGlInfo()
-        self.statusbar.showMessage(info, 5000)
-        # self.viewerWidget.update()
-        print("gl initialized in app")
-        # self.viewerWidget.show()
+        self.glInfoBrowser.clear()
+        self.glInfoBrowser.setPlainText(info)
 
     def replaceViewerWidget(self, glwidget):
         "replace viewer widget with the given instantiated glwidget"
@@ -179,116 +243,82 @@ class AppWindowFinal(AppWindowInit):
         glwidget = self.availableGlWidgets[glchoice](vertices, vertexNb)
         self.replaceViewerWidget(glwidget)
 
-    def moveGLCamera(self, direction: str):
-        self.viewerWidget.moveCamera(direction)
-
-    def moveCameraForward(self):
-        self.moveGLCamera("forward")
-
-    def moveCameraBackward(self):
-        self.moveGLCamera("backward")
-
-    def moveCameraLeft(self):
-        self.moveGLCamera("left")
-
-    def moveCameraRight(self):
-        self.moveGLCamera("right")
-
-    def turnCameraX(self, newVal: int):
-        "Turn camera around"
-        offsetx = newVal - self.lastCamXVal
-        valy = self.rotCamY.value() - self.lastCamYVal
-        self.viewerWidget.turnAround(x=float(offsetx), y=float(valy))
-        self.lastCamXVal = newVal
-
-    def turnCameraY(self, newVal: int):
-        "Turn camera around"
-        offsety = newVal - self.lastCamYVal
-        valx = self.rotCamX.value() - self.lastCamXVal
-        self.viewerWidget.turnAround(x=float(valx), y=float(offsety))
-        self.lastCamYVal = newVal
-
-    def setAngle(self):
-        angl = self.rotAngle.value()
-        self.viewerWidget.setRotationAngle(angl)
-
-    def setShininess(self):
-        shin = self.shinSpin.value()
-        self.viewerWidget.changeShininess(shin)
-
-    def setAmbientCoeff(self):
-        "set ambient coefficient to gl widget"
-        val = self.ambientCoeff.value()
-        print("ambient val")
-        self.viewerWidget.changeAmbientCoeff(val)
-
-    def moveLightPosForward(self):
-        ""
-        offsetx = 0.0
-        offsety = 0.0
-        offsetz = -0.5
-        self.viewerWidget.moveLight(
-            xoffset=offsetx, yoffset=offsety, zoffset=offsetz
+    def getParams(self) -> dict:
+        "Get parameters from widgets"
+        red = self.colorR.value()
+        green = self.colorG.value()
+        blue = self.colorB.value()
+        rotation_angle = self.rotAngle.value()
+        shininess = self.shinSpin.value()
+        ambient_coeff = self.ambientCoeff.value()
+        light_position = self.viewerWidget.lamp.position
+        light_direction = self.viewerWidget.lamp.direction
+        light_attenuation = self.viewerWidget.lamp.attenuation
+        light_cutoff = self.viewerWidget.lamp.cutOff
+        camera_position = self.viewerWidget.camera.position
+        camera_matrix = self.viewerWidget.camera.getViewMatrix()
+        projectionMatrix = QtGui.QMatrix4x4()
+        projectionMatrix.perspective(
+            self.viewerWidget.camera.zoom,
+            self.viewerWidget.width() / self.viewerWidget.height(),
+            0.2,
+            100.0,
         )
-
-    def moveLightPosBackward(self):
-        ""
-        offsetx = 0.0
-        offsety = 0.0
-        offsetz = 0.5
-        self.viewerWidget.moveLight(
-            xoffset=offsetx, yoffset=offsety, zoffset=offsetz
+        model = QtGui.QMatrix4x4()
+        parameters = {}
+        vals = projectionMatrix.copyDataTo()
+        parameters["projection_matrix"] = vals
+        vals = camera_matrix.copyDataTo()
+        parameters["camera_view_matrix"] = vals
+        parameters["camera_position"] = dict(
+            x=camera_position.x(), y=camera_position.y(), z=camera_position.z()
         )
-
-    def moveLightPosLeft(self):
-        ""
-        offsetx = -1.0
-        offsety = 0.0
-        offsetz = 0.0
-        self.viewerWidget.moveLight(
-            xoffset=offsetx, yoffset=offsety, zoffset=offsetz
+        parameters["light_position"] = dict(
+            x=light_position.x(), y=light_position.y(), z=light_position.z()
         )
-
-    def moveLightPosRight(self):
-        ""
-        offsetx = 0.5
-        offsety = 0.0
-        offsetz = 0.0
-        self.viewerWidget.moveLight(
-            xoffset=offsetx, yoffset=offsety, zoffset=offsetz
+        parameters["light_direction"] = dict(
+            x=light_direction.x(), y=light_direction.y(), z=light_direction.z()
         )
-
-    def moveLightPosUp(self):
-        ""
-        offsetx = 0.0
-        offsety = 0.5
-        offsetz = 0.0
-        self.viewerWidget.moveLight(
-            xoffset=offsetx, yoffset=offsety, zoffset=offsetz
+        parameters["light_attenuation"] = dict(
+            x=light_attenuation.x(), y=light_attenuation.y(), z=light_attenuation.z()
         )
+        parameters["light_cutoff"] = str(light_cutoff)
+        parameters["ambient_coefficient"] = str(ambient_coeff)
+        parameters["intensities"] = {
+            "red_channel_light_intensity": str(red),
+            "green_channel_light_intensity": str(green),
+            "blue_channel_light_intensity": str(blue),
+        }
+        parameters["lamp_rotation_angle"] = str(rotation_angle)
+        return parameters
 
-    def moveLightPosDown(self):
-        ""
-        offsetx = 0.0
-        offsety = -0.5
-        offsetz = 0.0
-        self.viewerWidget.moveLight(
-            xoffset=offsetx, yoffset=offsety, zoffset=offsetz
+    def updateParamBrowser(self):
+        params = self.getParams()
+        self.paramBrowser.clear()
+        self.paramBrowser.setPlainText(str(params))
+
+    def captureParams(self):
+        params = self.getParams()
+        params["image-format"] = "PNG"
+        params["image-encoding"] = "hex"
+        lampShader = self.viewerWidget.lampShaderName
+        objectShader = self.viewerWidget.objectShaderName
+        params["light-source-shader"] = shaders[lampShader]
+        params["object-shader"] = shaders[objectShader]
+        screen = self.viewerWidget.grabFramebuffer()
+        barr = QtCore.QByteArray()
+        qbfr = QtCore.QBuffer(barr)
+        qbfr.open(QtCore.QIODevice.WriteOnly)
+        screen.save(qbfr, params["image-format"])
+        params["image"] = barr.data().hex()
+        fileName = QtWidgets.QFileDialog.getSaveFileName(
+            self.centralwidget, "Save Parameters", self.jsondir, "Json Files (*.json)"
         )
-
-    def rotateLights(self):
-        rx = self.rotLightX.value()
-        ry = self.rotLightY.value()
-        rz = self.rotLightZ.value()
-        self.viewerWidget.rotateLight(rx, ry, rz)
-
-    def changeLightColor(self):
-        diffr = self.lightRed.value()
-        diffg = self.lightGreen.value()
-        diffb = self.lightBlue.value()
-        self.viewerWidget.changeLampIntensity(channel="red", val=diffr)
-        self.viewerWidget.changeLampIntensity(channel="green", val=diffg)
-        self.viewerWidget.changeLampIntensity(channel="blue", val=diffb)
+        fpath = fileName[0]
+        if fpath:
+            with open(fpath, "w", encoding="utf-8", newline="\n") as fd:
+                pdb.set_trace()
+                json.dump(params, fd, ensure_ascii=False, indent=2)
 
     ### Standard Gui Elements ###
 

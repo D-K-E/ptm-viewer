@@ -48,9 +48,7 @@ except ImportError:
         "PyOpenGL must be installed to run this example.",
         QtWidgets.QMessageBox.Close,
     )
-    messageBox.setDetailedText(
-        "Run:\npip install PyOpenGL PyOpenGL_accelerate"
-    )
+    messageBox.setDetailedText("Run:\npip install PyOpenGL PyOpenGL_accelerate")
     messageBox.exec_()
     sys.exit(1)
 
@@ -115,11 +113,8 @@ class AbstractGLWidgetHelper(QOpenGLWidget):
         texture.create()
         texture.bind(unit)
         texture.setData(img)
-        texture.setMinMagFilters(
-            QOpenGLTexture.Nearest, QOpenGLTexture.Nearest
-        )
-        texture.setMinMagFilters(
-            QOpenGLTexture.Nearest, QOpenGLTexture.Nearest)
+        texture.setMinMagFilters(QOpenGLTexture.Nearest, QOpenGLTexture.Nearest)
+        texture.setMinMagFilters(QOpenGLTexture.Nearest, QOpenGLTexture.Nearest)
         texture.setWrapMode(QOpenGLTexture.DirectionS, QOpenGLTexture.Repeat)
         texture.setWrapMode(QOpenGLTexture.DirectionT, QOpenGLTexture.Repeat)
         return texture
@@ -519,9 +514,7 @@ class AbstractPointLightPtmGLWidget(AbstractGLWidgetHelper):
         # object: vbo, vao
         self.vbo.create()
         self.vbo.bind()
-        self.vbo.allocate(
-            self.vertices.tobytes(), self.vertices.size * floatSize
-        )
+        self.vbo.allocate(self.vertices.tobytes(), self.vertices.size * floatSize)
         #
         self.vao.create()
         self.vao.bind()
@@ -585,10 +578,14 @@ class PtmLambertianGLWidget(AbstractPointLightPtmGLWidget):
                 "texture": None,
             }
         ]
-        self.textures = [{"unit": 0,
-                          "name": "diffuseMap",
-                          "data": ptmImage.mirrored(),
-                          "texture": None}]
+        self.textures = [
+            {
+                "unit": 0,
+                "name": "diffuseMap",
+                "data": ptmImage.mirrored(),
+                "texture": None,
+            }
+        ]
         self.lampShaderName = lampShaderName
         self.objectShaderName = objectShaderName
 
@@ -902,24 +899,39 @@ class PtmNormalMapGLWidget(PtmLambertianGLWidget):
 class PtmPerChannelNormalMapGLWidget(PtmNormalMapGLWidget):
     "implement per channel normal map shader with opengl widget"
 
-    def __init__(self, ptmImage: QImage, normalMaps: Tuple[QImage],
-                 objectShaderName: str,
-                 lampShaderName="lamp", parent=None):
-        super().__init__(ptmImage=ptmImage, normalMap=normalMaps[0],
-                         lampShaderName=lampShaderName,
-                         objectShaderName=objectShaderName,
-                         parent=parent)
+    def __init__(
+        self,
+        ptmImage: QImage,
+        normalMaps: Tuple[QImage],
+        objectShaderName: str,
+        lampShaderName="lamp",
+        parent=None,
+    ):
+        super().__init__(
+            ptmImage=ptmImage,
+            normalMap=normalMaps[0],
+            lampShaderName=lampShaderName,
+            objectShaderName=objectShaderName,
+            parent=parent,
+        )
         self.textures = [
-            {"texture": None, "unit": 0, "name": "material.diffuseMap",
-             "data": ptmImage.mirrored()}
+            {
+                "texture": None,
+                "unit": 0,
+                "name": "material.diffuseMap",
+                "data": ptmImage.mirrored(),
+            }
         ]
         for i in range(len(normalMaps)):
             nmap = normalMaps[i].mirrored()
-            self.textures.append({
-                "unit": i+1,
-                "data": nmap,
-                "name": "material.normalMap" + str(i),
-                "texture": None})
+            self.textures.append(
+                {
+                    "unit": i + 1,
+                    "data": nmap,
+                    "name": "material.normalMap" + str(i),
+                    "texture": None,
+                }
+            )
         #
         self.vertices = None
         self.fromCoords2Vertices()
@@ -932,24 +944,39 @@ class PtmPerChannelNormalMapGLWidget(PtmNormalMapGLWidget):
 class PtmPerChannelNormalMapPhongGLWidget(PtmNormalMapGLWidget):
     "Implement per channel normal map phong shader with opengl widget"
 
-    def __init__(self, ptmImage: QImage, normalMaps: Tuple[QImage],
-                 objectShaderName="phong",
-                 lampShaderName="lamp", parent=None):
-        super().__init__(ptmImage=ptmImage, normalMap=normalMaps[0],
-                         lampShaderName=lampShaderName,
-                         objectShaderName=objectShaderName,
-                         parent=parent)
+    def __init__(
+        self,
+        ptmImage: QImage,
+        normalMaps: Tuple[QImage],
+        objectShaderName="phong",
+        lampShaderName="lamp",
+        parent=None,
+    ):
+        super().__init__(
+            ptmImage=ptmImage,
+            normalMap=normalMaps[0],
+            lampShaderName=lampShaderName,
+            objectShaderName=objectShaderName,
+            parent=parent,
+        )
         self.textures = [
-            {"texture": None, "unit": 0, "name": "material.diffuseMap",
-             "data": ptmImage.mirrored()}
+            {
+                "texture": None,
+                "unit": 0,
+                "name": "material.diffuseMap",
+                "data": ptmImage.mirrored(),
+            }
         ]
         for i in range(len(normalMaps)):
             nmap = normalMaps[i].mirrored()
-            self.textures.append({
-                "unit": i+1,
-                "data": nmap,
-                "name": "material.normalMap" + str(i),
-                "texture": None})
+            self.textures.append(
+                {
+                    "unit": i + 1,
+                    "data": nmap,
+                    "name": "material.normalMap" + str(i),
+                    "texture": None,
+                }
+            )
         #
         # fmt: off
         self.vertices = np.array(
@@ -983,28 +1010,32 @@ class PtmPerChannelNormalMapPhongGLWidget(PtmNormalMapGLWidget):
         self.program.setUniformValue("viewerPosition", self.camera.position)
         self.program.setUniformValue("light.position", pos)
         self.program.setUniformValue("light.direction", self.lamp.direction)
-        self.program.setUniformValue("light.color",
-                                     color)
-        self.program.setUniformValue("light.attenuation",
-                                     self.lamp.attenuation)
+        self.program.setUniformValue("light.color", color)
+        self.program.setUniformValue("light.attenuation", self.lamp.attenuation)
         self.program.setUniformValue("light.cutOff", self.lamp.cutOff)
-        self.program.setUniformValue("light.outerCutOff",
-                                     self.lamp.outerCutOff)
-        self.program.setUniformValue("material.shininess",
-                                     self.shininess)
+        self.program.setUniformValue("light.outerCutOff", self.lamp.outerCutOff)
+        self.program.setUniformValue("material.shininess", self.shininess)
         self.program.setUniformValue("ambientCoeff", self.ambientCoeff)
 
 
 class PtmPerChannelNormalMapDirGLWidget(PtmPerChannelNormalMapGLWidget):
     "directional light normal mapping"
 
-    def __init__(self, ptmImage: QImage, normalMaps: Tuple[QImage],
-                 objectShaderName="quadDir",
-                 lampShaderName="lamp", parent=None):
-        super().__init__(ptmImage=ptmImage, normalMaps=normalMaps,
-                         lampShaderName=lampShaderName,
-                         objectShaderName=objectShaderName,
-                         parent=parent)
+    def __init__(
+        self,
+        ptmImage: QImage,
+        normalMaps: Tuple[QImage],
+        objectShaderName="quadDir",
+        lampShaderName="lamp",
+        parent=None,
+    ):
+        super().__init__(
+            ptmImage=ptmImage,
+            normalMaps=normalMaps,
+            lampShaderName=lampShaderName,
+            objectShaderName=objectShaderName,
+            parent=parent,
+        )
 
     def setObjectShaderUniforms_proc(self):
         "set object shader"
@@ -1021,25 +1052,32 @@ class PtmPerChannelNormalMapDirGLWidget(PtmPerChannelNormalMapGLWidget):
         self.program.setUniformValue("model", model)
         self.program.setUniformValue("viewPos", self.camera.position)
         self.program.setUniformValue("light.direction", self.lamp.direction)
-        self.program.setUniformValue("light.color",
-                                     color)
-        self.program.setUniformValue("material.shininess",
-                                     self.shininess)
-        self.program.setUniformValue("ambient", QVector3D(self.ambientCoeff,
-                                                          self.ambientCoeff,
-                                                          self.ambientCoeff))
+        self.program.setUniformValue("light.color", color)
+        self.program.setUniformValue("material.shininess", self.shininess)
+        self.program.setUniformValue(
+            "ambient",
+            QVector3D(self.ambientCoeff, self.ambientCoeff, self.ambientCoeff),
+        )
 
 
 class PtmPerChannelNormalMapPointGLWidget(PtmPerChannelNormalMapGLWidget):
     "directional light normal mapping"
 
-    def __init__(self, ptmImage: QImage, normalMaps: Tuple[QImage],
-                 objectShaderName="quadPoint",
-                 lampShaderName="lamp", parent=None):
-        super().__init__(ptmImage=ptmImage, normalMaps=normalMaps,
-                         lampShaderName=lampShaderName,
-                         objectShaderName=objectShaderName,
-                         parent=parent)
+    def __init__(
+        self,
+        ptmImage: QImage,
+        normalMaps: Tuple[QImage],
+        objectShaderName="quadPoint",
+        lampShaderName="lamp",
+        parent=None,
+    ):
+        super().__init__(
+            ptmImage=ptmImage,
+            normalMaps=normalMaps,
+            lampShaderName=lampShaderName,
+            objectShaderName=objectShaderName,
+            parent=parent,
+        )
 
     def setObjectShaderUniforms_proc(self):
         "set object shader"
@@ -1056,28 +1094,34 @@ class PtmPerChannelNormalMapPointGLWidget(PtmPerChannelNormalMapGLWidget):
         self.program.setUniformValue("model", model)
         self.program.setUniformValue("viewPos", self.camera.position)
         self.program.setUniformValue("light.position", pos)
-        self.program.setUniformValue("light.color",
-                                     color)
-        self.program.setUniformValue("light.attenuation",
-                                     self.lamp.attenuation)
+        self.program.setUniformValue("light.color", color)
+        self.program.setUniformValue("light.attenuation", self.lamp.attenuation)
 
-        self.program.setUniformValue("material.shininess",
-                                     self.shininess)
-        self.program.setUniformValue("ambient", QVector3D(self.ambientCoeff,
-                                                          self.ambientCoeff,
-                                                          self.ambientCoeff))
+        self.program.setUniformValue("material.shininess", self.shininess)
+        self.program.setUniformValue(
+            "ambient",
+            QVector3D(self.ambientCoeff, self.ambientCoeff, self.ambientCoeff),
+        )
 
 
 class PtmPerChannelNormalMapSpotGLWidget(PtmPerChannelNormalMapGLWidget):
     "directional light normal mapping"
 
-    def __init__(self, ptmImage: QImage, normalMaps: Tuple[QImage],
-                 objectShaderName="quadSpot",
-                 lampShaderName="lamp", parent=None):
-        super().__init__(ptmImage=ptmImage, normalMaps=normalMaps,
-                         lampShaderName=lampShaderName,
-                         objectShaderName=objectShaderName,
-                         parent=parent)
+    def __init__(
+        self,
+        ptmImage: QImage,
+        normalMaps: Tuple[QImage],
+        objectShaderName="quadSpot",
+        lampShaderName="lamp",
+        parent=None,
+    ):
+        super().__init__(
+            ptmImage=ptmImage,
+            normalMaps=normalMaps,
+            lampShaderName=lampShaderName,
+            objectShaderName=objectShaderName,
+            parent=parent,
+        )
 
     def setObjectShaderUniforms_proc(self):
         "set object shader"
@@ -1095,29 +1139,29 @@ class PtmPerChannelNormalMapSpotGLWidget(PtmPerChannelNormalMapGLWidget):
         self.program.setUniformValue("viewPos", self.camera.position)
         self.program.setUniformValue("light.position", pos)
         self.program.setUniformValue("light.direction", self.lamp.direction)
-        self.program.setUniformValue("light.color",
-                                     color)
-        self.program.setUniformValue("light.attenuation",
-                                     self.lamp.attenuation)
+        self.program.setUniformValue("light.color", color)
+        self.program.setUniformValue("light.attenuation", self.lamp.attenuation)
         self.program.setUniformValue("light.cutOff", self.lamp.cutOff)
-        self.program.setUniformValue("light.outerCutOff",
-                                     self.lamp.outerCutOff)
+        self.program.setUniformValue("light.outerCutOff", self.lamp.outerCutOff)
 
-        self.program.setUniformValue("material.shininess",
-                                     self.shininess)
-        self.program.setUniformValue("ambient", QVector3D(self.ambientCoeff,
-                                                          self.ambientCoeff,
-                                                          self.ambientCoeff))
+        self.program.setUniformValue("material.shininess", self.shininess)
+        self.program.setUniformValue(
+            "ambient",
+            QVector3D(self.ambientCoeff, self.ambientCoeff, self.ambientCoeff),
+        )
 
 
 class PtmCoefficientShader(AbstractPointLightPtmGLWidget):
     "Use directly ptm coefficients in shader"
 
-    def __init__(self, coeffs: np.ndarray,
-                 vertexNb: int,
-                 lampShaderName="lamp",
-                 objectShaderName="rgbcoeff",
-                 parent=None):
+    def __init__(
+        self,
+        coeffs: np.ndarray,
+        vertexNb: int,
+        lampShaderName="lamp",
+        objectShaderName="rgbcoeff",
+        parent=None,
+    ):
         super().__init__(parent=parent)
         self.vertices = coeffs
         self.isBlinn = False
@@ -1230,11 +1274,8 @@ class PtmCoefficientShader(AbstractPointLightPtmGLWidget):
         # object: vbo, vao
         self.vbo.create()
         self.vbo.bind()
-        self.vbo.allocate(
-            self.vertices.tobytes(), self.vertices.size * floatSize
-        )
-        self.vbo.allocate(self.vertices.tobytes(),
-                          self.vertices.size * floatSize)
+        self.vbo.allocate(self.vertices.tobytes(), self.vertices.size * floatSize)
+        self.vbo.allocate(self.vertices.tobytes(), self.vertices.size * floatSize)
         #
         self.vao.create()
         self.vao.bind()
