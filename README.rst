@@ -26,13 +26,30 @@ Quick Start
 - Follow the installation procedure detailed in `here <docs/install.rst>`_
 - Activate your conda environment from terminal
 - Go to repository
-- `cd ptmviewer`
-- `python qtapp.py`
+- From the location of `setup.py` at the main folder, start the program with 
+  `python ptmviewer/qtapp.py`
 
 Roadmap
 ========
 
-- Handle more advanced shading.
+Milestone 0.1.0
+-------------
+
+- Smoother UI with dock widgets
+
+- Reproducible lightening conditions using lightning parameter serialization
+
+- Handle light and camera rotation in all axes.
+
+- Handle light and camera movement in all axes.
+
+- Small notepad for taking notes about the object as it is seen by the user.
+
+
+Milestone 0.2.0
+---------------
+
+- Add a couple of other shaders.
 
   - PBR if possible
 
