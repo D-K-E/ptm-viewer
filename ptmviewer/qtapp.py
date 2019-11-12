@@ -113,7 +113,7 @@ class AppWindowFinal(AppWindowInit):
         self.captureBtn.clicked.connect(self.captureParams)
 
         ## transcribe widget
-        self.saveBtn.clicked.connect(lambda x: x)
+        self.saveBtn.clicked.connect(self.saveNotes)
 
         ## move widget
         ### Available buttons
@@ -169,6 +169,7 @@ class AppWindowFinal(AppWindowInit):
         ptmdir = os.path.join(maindir, "ptmviewer")
         assetdir = os.path.join(ptmdir, "assets")
         self.jsondir = os.path.join(assetdir, "jsons")
+        self.notedir = os.path.join(assetdir, "notes")
 
     # Ptm related stuff
     def loadPtm(self):
@@ -317,8 +318,19 @@ class AppWindowFinal(AppWindowInit):
         fpath = fileName[0]
         if fpath:
             with open(fpath, "w", encoding="utf-8", newline="\n") as fd:
-                pdb.set_trace()
                 json.dump(params, fd, ensure_ascii=False, indent=2)
+
+    def saveNotes(self):
+        "Save notes in the transcription dock widget"
+        text = self.transcribeEdit.toPlainText()
+        fileName = QtWidgets.QFileDialog.getSaveFileName(
+            self.centralwidget, "Save Notes", self.notedir, "Text Files (*.txt)"
+        )
+        fpath = fileName[0]
+        if fpath:
+            with open(fpath, "w", encoding="utf-8", newline="\n") as fd:
+                fd.write(text)
+
 
     ### Standard Gui Elements ###
 
