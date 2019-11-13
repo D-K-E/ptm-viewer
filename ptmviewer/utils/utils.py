@@ -34,7 +34,8 @@ def normalize_3col_array(arr):
 
 def get_vector_dot(arr1, arr2):
     "Get vector dot product for 2 matrices"
-    assert arr1.shape == arr2.shape
+    if arr1.shape != arr2.shape:
+        raise ValueError("arr1 and arr2 shape should be same")
     newarr = np.sum(arr1 * arr2, axis=1, dtype=np.float32)
     return newarr
 
@@ -42,7 +43,8 @@ def get_vector_dot(arr1, arr2):
 def get_matrix_to_vector_dot(mat: np.ndarray, vec: np.ndarray):
     "Get vector dot for each segment of matrix"
     mshape = mat[0, :].shape
-    assert mshape == vec.shape
+    if mshape != vec.shape:
+        raise ValueError("Matrix vector shape should be same with vector shape")
     d1 = get_vector_dot(mat[0, :], vec)
     d2 = get_vector_dot(mat[1, :], vec)
     d3 = get_vector_dot(mat[2, :], vec)
@@ -75,12 +77,12 @@ def getDistancePoint2Array(apoint, coordarr):
     return np.sqrt(xdist + ydist)
 
 
-def getInterpolationTable(arr: np.ndarray,
-        mapRange: Tuple[float, float]) -> dict:
+def getInterpolationTable(arr: np.ndarray, mapRange: Tuple[float, float]) -> dict:
     "Interpolate given one dimensional array into given range output as a table"
     assert arr.ndim == 1
     newarr = np.interp(arr, (arr.min(), arr.max()), mapRange)
-    return {arr[i]:newarr[i] for i in range(arr.size)}
+    return {arr[i]: newarr[i] for i in range(arr.size)}
+
 
 class ImageArray:
     "Image array have some additional properties besides np.ndarray"
@@ -164,7 +166,8 @@ def sliceCol(colInd: int, matrix):
 
 def mat2matDot(mat1: list, mat2: list):
     "Dot product in pure python"
-    assert len(mat1[0]) == len(mat2)
+    if len(mat1[0]) != len(mat2):
+        raise ValueError("mat1 row size is not equal mat2 column size")
     colnb = len(mat1[0])
     mat = []
     for rown in range(len(mat1)):

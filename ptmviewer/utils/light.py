@@ -9,6 +9,8 @@ from ptmviewer.utils.utils import vec2vecDot
 from ptmviewer.utils.utils import crossProduct
 from ptmviewer.utils.utils import computeFrontRightPure
 from ptmviewer.utils.utils import computeFrontRightQt
+from ptmviewer.utils.obj3d import PureRigid3dObject
+from ptmviewer.utils.obj3d import QtRigid3dObject
 
 
 class PureLightSource:

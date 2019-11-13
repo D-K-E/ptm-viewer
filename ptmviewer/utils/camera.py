@@ -14,6 +14,8 @@ from ptmviewer.utils.utils import move3dObjQt
 from PySide2.QtGui import QVector3D
 from PySide2.QtGui import QMatrix4x4
 from PySide2.QtGui import QVector4D
+from ptmviewer.utils.obj3d import PureRigid3dObject
+from ptmviewer.utils.obj3d import QtRigid3dObject
 
 
 class PureCamera:
@@ -208,8 +210,9 @@ class QtCamera:
             deltaTime=deltaTime,
             speed=self.movementSpeed,
             positionVector=self.position,
-            axvec1=self.front,
-            axvec2=self.right,
+            zaxis=self.front,
+            xaxis=self.right,
+            yaxis=self.up,
             availableMoves=self.availableMoves,
         )
 

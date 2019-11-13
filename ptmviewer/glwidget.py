@@ -316,11 +316,9 @@ class AbstractPointLightPtmGLWidget(AbstractGLWidgetHelper):
         self.shininess = val
         self.update()
 
-    def moveLight(self, xoffset: float, yoffset: float, zoffset: float):
+    def moveLight(self, direction: str):
         "Translate light position vector to a new position"
         currentPos = self.lamp.position
-        translationVec = QVector3D(xoffset, yoffset, zoffset)
-        newpos = currentPos + translationVec
         newpos = self.limitMovement(newpos)
         self.lamp.setPosition(vec=newpos)
         self.update()
