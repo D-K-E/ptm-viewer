@@ -20,9 +20,13 @@ class PureRigid3dObject:
     "Basic rigid body in 3d world"
 
     def __init__(self):
-        self.position = (0.0, 0.0, 0.0)  # object at the center of the world
+        self.position = {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0,
+        }  # object at the center of the world
         self.front = None
-        self.worldUp = (0.0, 1.0, 0.0)
+        self.worldUp = {"x": 0.0, "y": 1.0, "z": 0.0}
         # up with respect to center of the world
         self.up = None  # with respect to the objects current position
         self.right = None  # with respect to the objects current position
@@ -90,6 +94,22 @@ class PureRigid3dObject:
         self.right = normalize_tuple(self.right)
         self.up = crossProduct(self.right, self.front)
         self.up = normalize_tuple(self.up)
+        self.front = {"x": self.front[0], "y": self.front[1], "z": self.front[2]}
+        self.right = {"x": self.right[0], "y": self.right[1], "z": self.right[2]}
+        self.up = {"x": self.up[0], "y": self.up[1], "z": self.up[2]}
+
+    def translateVec(
+        self, axisVector: dict, positionVector: dict, velocity: float, isPlus=True
+    ) -> dict:
+        "Translate vector towards axis vector with velocity and position vector"
+        atpl = tuple(axisVector.values())
+        ptpl = tuple(positionVector.values())
+        multip = scalar2vecMult(atpl, velocity)
+        if isPlus:
+            newPosTpl = vec2vecAdd(ptpl, multip)
+        else:
+            newPosTpl = vec2vecSubs(ptpl, multip)
+        return {"x": newPosTpl[0], "y": newPosTpl[1], "z": newPosTpl[2]}
 
     def move2pos(self, direction: str, deltaTime: float):
         "move object to given direction"
@@ -102,25 +122,49 @@ class PureRigid3dObject:
                 )
             )
         if direction == "+z":
-            multip = scalar2vecMult(self.front, velocity)
-            positionVector = vec2vecAdd(self.position, multip)
+            position = self.translateVec(
+                axisVector=self.front,
+                positionVector=self.position,
+                velocity=velocity,
+                isPlus=True,
+            )
         elif direction == "-z":
-            multip = scalar2vecMult(self.front, velocity)
-            positionVector = vec2vecSubs(self.position, multip)
+            position = self.translateVec(
+                axisVector=self.front,
+                positionVector=self.position,
+                velocity=velocity,
+                isPlus=False,
+            )
         elif direction == "+x":
-            multip = scalar2vecMult(self.right, velocity)
-            positionVector = vec2vecAdd(self.position, multip)
+            position = self.translateVec(
+                axisVector=self.right,
+                positionVector=self.position,
+                velocity=velocity,
+                isPlus=True,
+            )
         elif direction == "-x":
-            multip = scalar2vecMult(self.right, velocity)
-            positionVector = vec2vecSubs(self.position, multip)
+            position = self.translateVec(
+                axisVector=self.right,
+                positionVector=self.position,
+                velocity=velocity,
+                isPlus=False,
+            )
         elif direction == "+y":
-            multip = scalar2vecMult(self.up, velocity)
-            positionVector = vec2vecAdd(self.position, multip)
+            position = self.translateVec(
+                axisVector=self.up,
+                positionVector=self.position,
+                velocity=velocity,
+                isPlus=True,
+            )
         elif direction == "-y":
-            multip = scalar2vecMult(self.up, velocity)
-            positionVector = vec2vecSubs(self.position, multip)
+            position = self.translateVec(
+                axisVector=self.up,
+                positionVector=self.position,
+                velocity=velocity,
+                isPlus=False,
+            )
 
-        return positionVector
+        return position
 
     def move(self, direction: str, deltaTime: float):
         "move object to its new position"
@@ -142,13 +186,28 @@ class PureRigid3dObject:
         self.roll = roll
         self.updateVectors()
 
-    def setWorldUp(self, wup: Tuple[float, float, float]):
+    def check_coordinate_proc(self, pos: dict):
+        "check coordinate type and value"
+        if not isinstance(pos, dict):
+            raise TypeError("Given coordinates are not in type dict: " + str(type(pos)))
+        pkeys = list(pos.keys())
+        if not all([True for k in pkeys if k in ["x", "y", "z"]]):
+            mess = "Given coordinates do not have x, y, z."
+            mess += " It has: " + str(pkeys)
+            raise ValueError(mess)
+        pvals = list(pos.values())
+        if not all([isinstance(v, float) for v in pvals]):
+            raise TypeError("Given coordinates do not have proper type float")
+
+    def setWorldUp(self, wup: dict):
         "world up"
+        self.check_coordinate_proc(wup)
         self.worldUp = wup
         self.updateVectors()
 
-    def setPosition(self, pos: Tuple[float, float, float]):
+    def setPosition(self, pos: dict):
         "set position"
+        self.check_coordinate_proc(pos)
         self.position = pos
         self.updateVectors()
 
@@ -250,12 +309,24 @@ class QtRigid3dObject(PureRigid3dObject):
             pos -= self.up * velocity
         return pos
 
+    def check_coordinate_proc(self, pos: QVector3D):
+        "check coordinate type and value"
+        if not isinstance(pos, QVector3D):
+            raise TypeError(
+                "Given coordinates are not in type QVector3D: " + str(type(pos))
+            )
+        pvals = [pos.x(), pos.y(), pos.z()]
+        if not all([isinstance(v, float) for v in pvals]):
+            raise TypeError("Given coordinates do not have proper type float")
+
     def setWorldUp(self, wup: QVector3D):
         "world up"
+        self.check_coordinate_proc(wup)
         self.worldUp = wup
         self.updateVectors()
 
     def setPosition(self, pos: QVector3D):
         "set position"
+        self.check_coordinate_proc(pos)
         self.position = pos
         self.updateVectors()

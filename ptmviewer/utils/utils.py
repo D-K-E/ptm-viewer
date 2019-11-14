@@ -164,7 +164,7 @@ def sliceCol(colInd: int, matrix):
     return [matrix[i, colInd] for i in range(rownb)]
 
 
-def mat2matDot(mat1: list, mat2: list):
+def mat2matDot(mat1: list, mat2: list) -> list:
     "Dot product in pure python"
     if len(mat1[0]) != len(mat2):
         raise ValueError("mat1 row size is not equal mat2 column size")
@@ -219,7 +219,7 @@ def computePerspectiveQt(fieldOfView: float, aspect: float, zNear: float, zFar: 
     return mat.perspective(fieldOfView, aspect, zNear, zFar)
 
 
-def computeLookAtPure(pos: tuple, target: tuple, worldUp: tuple):
+def computeLookAtPure(pos: tuple, target: tuple, worldUp: tuple) -> list:
     ""
     assert len(pos) == 3 and len(target) == 3
     assert len(worldUp) == 3
