@@ -17,8 +17,29 @@ from PySide2.QtGui import QVector4D
 from ptmviewer.utils.obj3d import PureRigid3dObject
 from ptmviewer.utils.obj3d import QtRigid3dObject
 
+from abc import ABC, abstractmethod
 
-class PureCamera(PureRigid3dObject):
+
+class AbstractCamera(ABC):
+    "An abstract camera class"
+
+    def __init__(self):
+        self.zoom = 45.0
+
+    @abstractmethod
+    def lookAround(self, xoffset: float, yoffset: float, pitchBound: bool):
+        raise NotImplementedError
+
+    @abstractmethod
+    def zoomInOut(self, yoffset: float, zoomBound=45.0):
+        raise NotImplementedError
+
+    @abstractmethod
+    def getViewMatrix(self):
+        raise NotImplementedError
+
+
+class PureCamera(PureRigid3dObject, AbstractCamera):
     "A camera that is in pure python for 3d movement"
 
     def __init__(self):
@@ -123,7 +144,7 @@ class PureCamera(PureRigid3dObject):
         return mes
 
 
-class QtCamera(QtRigid3dObject):
+class QtCamera(QtRigid3dObject, AbstractCamera):
     "An abstract camera for 3d movement in world"
 
     def __init__(self):
@@ -141,22 +162,6 @@ class QtCamera(QtRigid3dObject):
         self.movementSpeed = 2.5
         self.movementSensitivity = 0.00001
         self.zoom = 45.0
-
-    def updateVectors(self):
-        "Update the camera vectors and compute a new front"
-        yawRadian = np.radians(self.yaw)
-        yawCos = np.cos(yawRadian)
-        pitchRadian = np.radians(self.pitch)
-        pitchCos = np.cos(pitchRadian)
-        frontX = yawCos * pitchCos
-        frontY = np.sin(pitchRadian)
-        frontZ = np.sin(yawRadian) * pitchCos
-        self.front = QVector3D(frontX, frontY, frontZ)
-        self.front.normalize()
-        self.right = QVector3D.crossProduct(self.front, self.worldUp)
-        self.right.normalize()
-        self.up = QVector3D.crossProduct(self.right, self.front)
-        self.up.normalize()
 
     def lookAround(self, xoffset: float, yoffset: float, pitchBound: bool):
         "Look around with camera"
@@ -210,28 +215,6 @@ class QtCamera(QtRigid3dObject):
         self.zoom = zoom
         self.updateVectors()
 
-    def setWorldUp(self, worldUp: QVector3D):
-        "Set new world up"
-        self.check_coordinate_proc(worldUp)
-        self.worldUp = worldUp
-        self.updateVectors()
-
-    def setPitch(self, pitch: float):
-        "Set new pitch and set other stuff"
-        self.pitch = pitch
-        self.updateVectors()
-
-    def setPosition(self, position: QVector3D):
-        "Set camera position and compute other with respect to new position"
-        self.check_coordinate_proc(position)
-        self.position = position
-        self.updateVectors()
-
-    def setYaw(self, yaw: float):
-        "Set new yaw and compute other stuff"
-        self.yaw = yaw
-        self.updateVectors()
-
     def setCameraWithFloatVals(
         self,
         posx=0.0,
@@ -258,7 +241,7 @@ class QtCamera(QtRigid3dObject):
 
     def __str__(self):
         "string representation"
-        mess = "Camera: position {0}, yaw: {1}, pitch: {2}, world up:{3}"
+        mess = "Qt Camera: position {0}, yaw: {1}, pitch: {2}, world up:{3}"
         mes = mess.format(
             str(self.position), str(self.yaw), str(self.pitch), str(self.worldUp)
         )

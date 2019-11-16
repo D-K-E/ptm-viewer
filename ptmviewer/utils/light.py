@@ -4,6 +4,7 @@
 
 import math
 from PySide2.QtGui import QVector3D
+from PySide2.QtGui import QVector4D
 from ptmviewer.utils.utils import normalize_tuple
 from ptmviewer.utils.utils import vec2vecDot
 from ptmviewer.utils.utils import crossProduct
@@ -12,49 +13,85 @@ from ptmviewer.utils.utils import computeFrontRightQt
 from ptmviewer.utils.obj3d import PureRigid3dObject
 from ptmviewer.utils.obj3d import QtRigid3dObject
 
+from abc import ABC, abstractmethod
 
-class PureLightSource:
+
+class AbstractLightSource(ABC):
+    def __init__(self):
+        self.intensity = {}
+        self.attenuation = {}
+        self.coeffs = {}
+        self.color = {}
+        self.cutOff = math.cos(math.radians(12.5))
+        self.outerCutOff = math.cos(math.radians(15.5))
+
+    @abstractmethod
+    def set_attenuation(self, attenuation):
+        raise NotImplementedError
+
+    @abstractmethod
+    def set_color(self):
+        raise NotImplementedError
+
+    def check_intensity_coeff(self, val: float, valname: str):
+        if not isinstance(val, float):
+            raise TypeError(
+                "Given " + valname + " is not of type float: ", str(type(val))
+            )
+        if not (val >= 0.0 and val <= 1.0):
+            raise ValueError(
+                "value " + valname + " not in given range 0.0 - 1.0: " + str(val)
+            )
+
+    def check_notFloat_proc(self, val: float, name: str):
+        if not isinstance(val, float):
+            raise TypeError(name + " is not of type float: " + str(type(val)))
+
+    @abstractmethod
+    def set_channel_intensity(self, channel: str, val: float):
+        raise NotImplementedError
+
+    @abstractmethod
+    def set_channel_coeff(self, channel: str, val: float):
+        raise NotImplementedError
+
+    def set_cut_off(self, val: float):
+        ""
+        self.check_notFloat_proc(val, "cut off")
+        self.cutOff = math.cos(math.radians(val))
+
+    def set_outer_cut_off(self, val: float):
+        ""
+        self.check_notFloat_proc(val, "outer cut off")
+        self.outerCutOff = math.cos(math.radians(val))
+
+    def get_coeff_average(self):
+        "Get the average value of its coefficients"
+        counter = 0
+        for val in self.coeffs.values():
+            counter += val
+        return counter / len(self.coeffs)
+
+
+class PureLightSource(AbstractLightSource):
     "A pure python light source implementation"
 
     def __init__(
         self,
-        posx=0.0,
-        posy=1.0,
-        posz=0.0,
-        dirx=0.0,
-        diry=-1.0,
-        dirz=-0.1,
         cutOff=12.5,
         outerCutOff=15.5,
-        attenuationConstant=1.0,
-        attenuationLinear=0.7,
-        attenuationQuadratic=1.8,
-        intensityRed=1.0,
-        intensityRedCoeff=1.0,
-        intensityGreen=1.0,
-        intensityGreenCoeff=1.0,
-        intensityBlue=1.0,
-        intensityBlueCoeff=1.0,
+        attenuation={"constant": 1.0, "linear": 0.7, "quadratic": 1.8},
+        intensity={"r": 1.0, "g": 1.0, "b": 1.0},
+        coeffs={"r": 1.0, "g": 1.0, "b": 1.0},
     ):
         ""
-        self.position = {"x": posx, "y": posy, "z": posz}
-        self.direction = {"x": dirx, "y": diry, "z": dirz}
-        self.intensity = {"r": intensityRed, "g": intensityGreen, "b": intensityBlue}
-        self.coeffs = {
-            "r": intensityRedCoeff,
-            "g": intensityGreenCoeff,
-            "b": intensityBlueCoeff,
-        }
-        self.color = {
-            "r": intensityRed * intensityRedCoeff,
-            "g": intensityGreen * intensityGreenCoeff,
-            "b": intensityBlue * intensityBlueCoeff,
-        }
+        self.intensity = intensity
+        self.coeffs = coeffs
+        self.color = {}
+        self.set_color()
         self.cutOff = math.cos(math.radians(cutOff))
         self.outerCutOff = math.cos(math.radians(outerCutOff))
-        self.attenConst = attenuationConstant
-        self.attenLinear = attenuationLinear
-        self.attenQuad = attenuationQuadratic
+        self.attenuation = attenuation
         self.attenVals = [
             # data taken on 2019-08-30 from
             # https://learnopengl.com/Lighting/Light-casters
@@ -76,9 +113,9 @@ class PureLightSource:
     def setAttenuationByTableVals(self, index: int):
         "Set attenuation values by table"
         row = self.attenVals[index]
-        self.attenConst = row[1]
-        self.attenLinear = row[2]
-        self.attenQuad = row[3]
+        self.attenuation["constant"] = row[1]
+        self.attenuation["linear"] = row[2]
+        self.attenuation["quadratic"] = row[3]
 
     def setAttenuationValuesByDistance(self, distance: float):
         ""
@@ -91,116 +128,73 @@ class PureLightSource:
         if distance <= mindist:
             self.setAttenuationByTableVals(0)
             return
-        for i, dist, aconst, alin, aquad in enumerate(self.attenVals):
+        for i, attenlst in enumerate(self.attenVals):
+            dist = attenlst[0]
             if dist > distance:
                 self.setAttenuationByTableVals(i)
                 return
 
     def computeAttenuation4Distance(self, distance: float):
         "compute attenuation value for given distance"
-        second = self.attenLinear * distance
-        third = self.attenQuad * distance * distance
-        return min(1, 1 / (self.attenConst + second + third))
+        second = self.attenuation["linear"] * distance
+        third = self.attenuation["quadratic"] * distance * distance
+        return min(1, 1 / (self.attenuation["constant"] + second + third))
 
-    def setAttenuation(self, aConst: float, aLin: float, aQuad: float):
+    def set_attenuation(self, atten: dict):
         "set attenuation"
-        if not isinstance(aConst, float):
-            raise TypeError(
-                "constant attenuation is not of type float: " + str(type(aConst))
-            )
-        if not isinstance(aLin, float):
-            raise TypeError(
-                "linear attenuation is not of type float: " + str(type(aLin))
-            )
-        if not isinstance(aQuad, float):
-            raise TypeError(
-                "quadratic attenuation is not of type float: " + str(type(aQuad))
-            )
-        self.attenConst = aConst
-        self.attenLinear = aLin
-        self.attenQuad = aQuad
+        constant = atten["constant"]
+        linear = atten["linear"]
+        quadratic = atten["quadratic"]
+        self.check_notFloat_proc(constant, name="constant attenuation")
+        self.check_notFloat_proc(linear, name="linear attenuation")
+        self.check_notFloat_proc(quadratic, name="quadratic attenuation")
+        self.attenuation["constant"] = constant
+        self.attenuation["linear"] = linear
+        self.attenuation["quadratic"] = quadratic
 
-    def setColor(self):
+    def set_color(self):
         "Set color"
-        self.color = {
-            "r": self.intensity["r"] * self.coeffs["r"],
-            "g": self.intensity["g"] * self.coeffs["g"],
-            "b": self.intensity["b"] * self.coeffs["b"],
-        }
+        self.color = {}
+        for channel, val in self.intensity.items():
+            coeff = self.coeffs[channel]
+            self.color[channel] = coeff * val
 
-    def setIntensity(self, channel: str, val: float):
-        "Set channel intensity"
-        if not isinstance(val, float):
-            raise TypeError("Given value is not of type float: ", str(type(val)))
-        if not (val >= 0.0 and val <= 1.0):
-            raise ValueError("value not in given range 0.0 - 1.0: " + str(val))
-        #
+    @staticmethod
+    def set_channel_val(channel: str, val: float):
+        channel_d = {}
         name = channel.lower()
         if name == "red" or name == "r":
-            self.intensity["r"] = val
+            channel_d["r"] = val
         elif name == "green" or name == "g":
-            self.intensity["g"] = val
+            channel_d["g"] = val
         elif name == "blue" or name == "b":
-            self.intensity["b"] = val
+            channel_d["b"] = val
+        elif name == "alpha" or name == "a":
+            channel_d["a"] = val
         else:
-            mess = "Unknown channel name " + name
+            mess = "Unrecognized channel name " + name
             mess += ", available channels are: "
-            mess += "red, green, blue"
+            mess += "red, green, blue, alpha"
             raise ValueError(mess)
-        self.setColor()
+        return channel_d
 
-    def setCoeffs(self, channel: str, val: float):
+    def set_channel_coeff(self, channel: str, val: float):
         "Set coefficients"
-        if not isinstance(val, float):
-            raise TypeError("Given value is not of type float: ", str(type(val)))
-        if not (val >= 0.0 and val <= 1.0):
-            raise ValueError("value not in given range 0.0 - 1.0: " + str(val))
+        self.check_intensity_coeff(val, channel + " coefficient")
         #
         name = channel.lower()
-        if name == "red" or name == "r":
-            self.coeffs["r"] = val
-        elif name == "green" or name == "g":
-            self.coeffs["g"] = val
-        elif name == "blue" or name == "b":
-            self.coeffs["b"] = val
-        else:
-            mess = "Unknown channel name " + name
-            mess += ", available channels are: "
-            mess += "red, green, blue"
-            raise ValueError(mess)
-        self.setColor()
+        cdict = self.set_channel_val(channel, val)
+        self.coeffs.update(cdict)
+        self.set_color()
 
-    def check_notFloat_proc(self, val: float, name: str):
-        if not isinstance(val, float):
-            raise TypeError(name + " is not of type float: " + str(type(val)))
-
-    def setPosition(self, x: float, y: float, z: float):
-        "set position of the light source"
-        self.check_notFloat_proc(x, name="x")
-        self.check_notFloat_proc(y, name="y")
-        self.check_notFloat_proc(z, name="z")
-        self.position = {"x": x, "y": y, "z": z}
-
-    def setDirection(self, x: float, y: float, z: float):
-        "set direction of the light source"
-        self.check_notFloat_proc(x, name="x")
-        self.check_notFloat_proc(y, name="y")
-        self.check_notFloat_proc(z, name="z")
-        self.direction = {"x": x, "y": y, "z": z}
-
-    def setCutOff(self, val: float):
-        ""
-        self.cutOff = math.cos(math.radians(val))
-
-    def setOuterCutOff(self, val: float):
-        ""
-        self.outerCutOff = math.cos(math.radians(val))
-
-    def getCoeffAverage(self):
-        "Get the average value of its coefficients"
-        red, green = self.coeffs["r"], self.coeffs["g"]
-        blue = self.coeffs["b"]
-        return (red + green + blue) / 3
+    def set_channel_intensity(self, channel: str, val: float):
+        "set channel intensity"
+        self.check_intensity_coeff(val, channel + " intensity")
+        #
+        name = channel.lower()
+        cdict = self.set_channel_val(channel, val)
+        self.intensity.update(cdict)
+        self.set_color()
 
     def __str__(self):
         ""
@@ -223,55 +217,47 @@ class PureLightSource:
         )
 
 
-class QtLightSource(PureLightSource):
+class QtLightSource(AbstractLightSource):
     "A light source"
 
     def __init__(
         self,
-        position=QVector3D(0.0, 1.0, 0.0),
-        direction=QVector3D(0.0, -1.0, -0.1),
-        intensity=QVector3D(1.0, 1.0, 1.0),
-        coefficients=QVector3D(1.0, 1.0, 1.0),
+        intensity=QVector4D(1.0, 1.0, 1.0, 1.0),
+        coefficients=QVector4D(1.0, 1.0, 1.0, 1.0),
         attenuation=QVector3D(1.0, 0.14, 0.07),
         cutOff=12.5,
         outerCutOff=15.0,
     ):
         ""
-        super().__init__(
-            posx=position.x(),
-            posy=position.y(),
-            posz=position.z(),
-            dirx=direction.x(),
-            diry=direction.y(),
-            dirz=direction.z(),
-            cutOff=math.cos(math.radians(12.5)),
-            attenuationConstant=attenuation.x(),
-            attenuationLinear=attenuation.y(),
-            attenuationQuadratic=attenuation.z(),
-            intensityRed=intensity.x(),
-            intensityRedCoeff=coefficients.x(),
-            intensityGreen=intensity.y(),
-            intensityGreenCoeff=coefficients.y(),
-            intensityBlue=intensity.z(),
-            intensityBlueCoeff=coefficients.z(),
-        )
-        self.position = position
-        self.direction = direction
-        self.color = QVector3D()
+        self.color = QVector4D()
         self.intensity = intensity
         self.coeffs = coefficients
-        self.setColor()
+        self.set_color()
         self.cutOff = math.cos(math.radians(cutOff))
         self.outerCutOff = math.cos(math.radians(outerCutOff))
         self.attenuation = attenuation
+        self.attenVals = [
+            # data taken on 2019-08-30 from
+            # https://learnopengl.com/Lighting/Light-casters
+            # distance, attenConst, attenLin, attenQaud
+            [7, 1.0, 0.14, 0.07],
+            [13, 1.0, 0.35, 0.44],
+            [20, 1.0, 0.22, 0.20],
+            [32, 1.0, 0.14, 0.07],
+            [50, 1.0, 0.09, 0.032],
+            [65, 1.0, 0.07, 0.017],
+            [100, 1.0, 0.045, 0.0075],
+            [160, 1.0, 0.027, 0.0028],
+            [200, 1.0, 0.022, 0.0019],
+            [325, 1.0, 0.014, 0.0007],
+            [600, 1.0, 0.007, 0.0002],
+            [3250, 1.0, 0.0014, 0.000007],
+        ]
 
     def setAttenuationByTableVals(self, index: int):
         "Set attenuation values by table"
         row = self.attenVals[index]
-        self.attenConst = row[1]
-        self.attenLinear = row[2]
-        self.attenQuad = row[3]
-        self.attenuation = QVector3D(row[1], row[2], row[3])
+        self.attenuation = QVector4D(row[1], row[2], row[3], 1.0)
 
     def setAttenuationByDistance(self, distance: float):
         ""
@@ -284,159 +270,108 @@ class QtLightSource(PureLightSource):
         if distance <= mindist:
             self.setAttenuationByTableVals(0)
             return
-        for i, dist, aconst, alin, aquad in enumerate(self.attenVals):
+        for i, (dist, aconst, alin, aquad) in enumerate(self.attenVals):
             if dist > distance:
                 self.setAttenuationByTableVals(i)
                 return
 
-    def check_notFloat_vec_proc(self, vec: QVector3D):
+    def check_notFloat_vec_proc(self, vec, vecname: str):
         "check whether all members of vectors are float"
-        x = vec.x()
-        y = vec.y()
-        z = vec.z()
-        self.check_notFloat_proc(x, name="x")
-        self.check_notFloat_proc(y, name="y")
-        self.check_notFloat_proc(z, name="z")
+        tpl = vec.toTuple()
+        for t in tpl:
+            self.check_notFloat_proc(t, name=vecname + " member")
 
-    def setAttenuation(self, **kwargs):
+    def set_attenuation(self, atten):
         "set attenuation"
-        if "vec" in kwargs:
-            vec = kwargs["vec"]
-            self.check_notFloat_vec_proc(vec)
-            self.attenuation = vec
-        else:
-            x = kwargs["x"]
-            y = kwargs["y"]
-            z = kwargs["z"]
-            vec = QVector3D(x, y, z)
-            self.check_notFloat_vec_proc(vec)
-            self.attenuation = vec
+        self.check_notFloat_vec_proc(atten, vecname="attenuation vector")
+        self.attenuation = atten
 
-    def setColor(self):
+    def set_color(self):
         "Set light source color using coeffs and intensities"
-        self.color = QVector3D(
-            self.intensity.x() * self.coeffs.x(),
-            self.intensity.y() * self.coeffs.y(),
-            self.intensity.z() * self.coeffs.z(),
-        )
-
-    def setIntensity(self, **kwargs):
-        "Set channel intensity to val"
-        if "vec" in kwargs:
-            vec = kwargs["vec"]
-            self.check_notFloat_vec_proc(vec)
-            self.intensity = vec
-            self.setColor()
-            return
-
-        name = kwargs["channel"]
-        val = kwargs["val"]
-        if not (val >= 0.0 and val <= 1.0):
-            raise ValueError("value not in acceptable range 0.0 - 1.0: " + str(val))
-        name = name.lower()
-        if name == "red" or name == "r":
-            self.intensity.setX(val)
-        elif name == "green" or name == "g":
-            self.intensity.setY(val)
-        elif name == "blue" or name == "b":
-            self.intensity.setZ(val)
+        if isinstance(self.intensity, QVector3D):
+            self.color = QVector3D(
+                self.intensity.x() * self.coeffs.x(),
+                self.intensity.y() * self.coeffs.y(),
+                self.intensity.z() * self.coeffs.z(),
+            )
         else:
-            mess = "Unknown channel name " + name
-            mess += ", available channels are: "
-            mess += "red, green, blue"
-            raise ValueError(mess)
-        self.setColor()
+            self.color = QVector4D(
+                self.intensity.x() * self.coeffs.x(),
+                self.intensity.y() * self.coeffs.y(),
+                self.intensity.z() * self.coeffs.z(),
+                self.intensity.w() * self.coeffs.w(),
+            )
 
-    def setCoeffs(self, **kwargs):
+    def set_channel_val(self, channel: str, val: float, isIntensity=False):
+        cvec = self.intensity if isIntensity else self.coeffs
+        name = channel.lower()
+        if name == "red" or name == "r":
+            cvec.setX(val)
+        elif name == "green" or name == "g":
+            cvec.setY(val)
+        elif name == "blue" or name == "b":
+            cvec.setZ(val)
+        elif name == "alpha" or name == "a":
+            cvec.setW(val)
+        else:
+            mess = "Unrecognized channel name " + name
+            mess += ", available channels are: "
+            mess += "red, green, blue, alpha"
+            raise ValueError(mess)
+        self.set_color()
+        return
+
+    def set_channel_coeff(self, **kwargs):
         "Set coefficient to given intesity"
-        if "vec" in kwargs:
-            vec = kwargs["vec"]
-            self.check_notFloat_vec_proc(vec)
-            self.coeffs = kwargs["vec"]
-            self.setColor()
-            return
-        name = kwargs["channel"]
-        val = kwargs["val"]
-        if not (val >= 0.0 and val <= 1.0):
-            raise ValueError("value not in acceptable range 0.0 - 1.0: " + str(val))
-        name = name.lower()
-        if name == "red" or name == "r":
-            self.coeffs.setX(val)
-        elif name == "green" or name == "g":
-            self.coeffs.setY(val)
-        elif name == "blue" or name == "b":
-            self.coeffs.setZ(val)
-        else:
-            mess = "Unknown channel name " + name
-            mess += ", available channels are: "
-            mess += "red, green, blue"
-            raise ValueError(mess)
-        self.setColor()
+        self.set_channel_val(channel, val, isIntensity=False)
 
-    def getCoeffAverage(self):
+    def set_channel_intensity(self, **kwargs):
+        "Set coefficient to given intesity"
+        self.set_channel_val(channel, val, isIntensity=True)
+
+    def get_coeff_average(self):
         "get average value for coefficients"
-        red, green = self.coeffs.x(), self.coeffs.y()
-        blue = self.coeffs.z()
-        return (red + green + blue) / 3
-
-    def setPosition(self, **kwargs):
-        "position as vector"
-        if "vec" in kwargs:
-            vec = kwargs["vec"]
-            self.check_notFloat_vec_proc(vec)
-            self.position = vec
-            return
-        x, y, z = kwargs["x"], kwargs["y"], kwargs["z"]
-        vec = QVector3D(x, y, z)
-        self.check_notFloat_vec_proc(vec)
-        self.position = vec
-
-    def setDirection(self, **kwargs):
-        "direction"
-        if "vec" in kwargs:
-            vec = kwargs["vec"]
-            self.check_notFloat_vec_proc(vec)
-            self.direction = vec
-            return
-        x, y, z = kwargs["x"], kwargs["y"], kwargs["z"]
-        vec = QVector3D(x, y, z)
-        self.check_notFloat_vec_proc(vec)
-        self.direction = vec
+        counter = 0
+        tplsize = 0
+        for el in self.coeffs.toTuple():
+            tplsize += 1
+            counter += el
+        return counter / tplsize
 
     def fromPureLightSource(self, light: PureLightSource):
         ""
-        self.setPosition(**light.position)
-        self.setDirection(**light.direction)
-        self.setIntensity(channel="r", val=light.intensity["r"])
-        self.setIntensity(channel="g", val=light.intensity["g"])
-        self.setIntensity(channel="b", val=light.intensity["b"])
-        self.setAttenuation(
-            aConst=light.attenConst, aLin=light.attenLinear, aQuad=light.attenQuad
-        )
-        self.setCoeffs(channel="r", val=light.coeffs["r"])
-        self.setCoeffs(channel="g", val=light.coeffs["g"])
-        self.setCoeffs(channel="b", val=light.coeffs["b"])
+        self.set_channel_intensity(channel="r", val=light.intensity["r"])
+        self.set_channel_intensity(channel="g", val=light.intensity["g"])
+        self.set_channel_intensity(channel="b", val=light.intensity["b"])
+        atten = QVector3D()
+        atten.setX(light.attenuation["constant"])
+        atten.setY(light.attenuation["linear"])
+        atten.setZ(light.attenuation["quadratic"])
+        self.set_attenuation(atten)
+        self.set_channel_coeff(channel="r", val=light.coeffs["r"])
+        self.set_channel_coeff(channel="g", val=light.coeffs["g"])
+        self.set_channel_coeff(channel="b", val=light.coeffs["b"])
         self.cutOff = light.cutOff
 
     def toPureLightSource(self):
         ""
         light = PureLightSource()
-        light.setPosition(x=self.position.x(), y=self.position.y(), z=self.position.z())
-        light.setDirection(
-            x=self.direction.x(), y=self.direction.y(), z=self.direction.z()
-        )
         light.setCutOff(self.cutOff)
-        light.setAttenuation(
-            aConst=self.attenuation.x(),
-            aLin=self.attenuation.y(),
-            aQuad=self.attenuation.z(),
-        )
-        light.setCoeffs(channel="r", val=self.coeffs.x())
-        light.setCoeffs(channel="g", val=self.coeffs.y())
-        light.setCoeffs(channel="b", val=self.coeffs.z())
-        light.setIntensity(channel="r", val=self.intensity.x())
-        light.setIntensity(channel="g", val=self.intensity.y())
-        light.setIntensity(channel="b", val=self.intensity.z())
+        atten = {}
+        atten["constant"] = self.attenuation.x()
+        atten["linear"] = self.attenuation.y()
+        atten["quadratic"] = self.attenuation.z()
+        light.setAttenuation(atten)
+        light.set_channel_coeff(channel="r", val=self.coeffs.x())
+        light.set_channel_coeff(channel="g", val=self.coeffs.y())
+        light.set_channel_coeff(channel="b", val=self.coeffs.z())
+        if isinstance(self.coeffs, QVector4D):
+            light.set_channel_coeff(channel="a", val=self.coeffs.w())
+        light.set_channel_intensity(channel="r", val=self.intensity.x())
+        light.set_channel_intensity(channel="g", val=self.intensity.y())
+        light.set_channel_intensity(channel="b", val=self.intensity.z())
+        if isinstance(self.intensity, QVector4D):
+            light.set_channel_intensity(channel="a", val=self.intensity.w())
         return light
 
 
@@ -566,8 +501,9 @@ class ShaderLight:
     def getPosition(self):
         return self.position
 
-    def setPosition(self, x: float, y: float, z: float):
+    def setPosition(self, pos: dict):
         "set position"
+        x, y, z = pos["x"], pos["y"], pos["z"]
         self.position = {"x": x, "y": y, "z": z}
         self.diffuse.setPosition(x=x, y=y, z=z)
         self.specular.setPosition(x=x, y=y, z=z)
@@ -575,8 +511,9 @@ class ShaderLight:
     def getDirection(self):
         return self.direction
 
-    def setDirection(self, x: float, y: float, z: float):
+    def setDirection(self, pos: dict):
         ""
+        x, y, z = pos["x"], pos["y"], pos["z"]
         self.direction = {"x": x, "y": y, "z": z}
         self.diffuse.setDirection(x=x, y=y, z=z)
         self.specular.setDirection(x=x, y=y, z=z)
@@ -685,10 +622,51 @@ class ShaderLight:
 
 class PureShaderLight(ShaderLight, PureRigid3dObject):
     "Shader light object for illumination"
-    pass
+
+    def __init__(
+        self,
+        posx=0.0,
+        posy=1.0,
+        posz=0.0,
+        dirx=0.0,
+        diry=-1.0,
+        dirz=-0.1,
+        attenuationConstant=1.0,
+        attenuationLinear=0.7,
+        attenuationQuadratic=1.8,
+        cutOff=12.5,
+        outerCutOff=15.0,
+        ambient=PureLightSource(
+            intensityRedCoeff=0.3, intensityGreenCoeff=0.3, intensityBlueCoeff=0.3
+        ),
+        diffuse=PureLightSource(),
+        specular=PureLightSource(),
+    ):
+        super().__init__(
+            posx=posx,
+            posy=posy,
+            posz=posz,
+            dirx=dirx,
+            diry=diry,
+            dirz=dirz,
+            attenuationConstant=attenuationConstant,
+            attenuationLinear=attenuationLinear,
+            attenuationQuadratic=attenuationQuadratic,
+            cutOff=cutOff,
+            outerCutOff=outerCutOff,
+            ambient=ambient,
+            diffuse=diffuse,
+            specular=diffuse,
+        )
+
+    def setPosition(self, pos: dict):
+        self.check_coordinate_proc(pos)
+        self.position = pos
+        self.diffuse.setPosition(x=pos["x"], y=pos["y"], z=pos["z"])
+        self.specular.setPosition(x=pos["x"], y=pos["y"], z=pos["z"])
 
 
-class QtShaderLight(PureShaderLight):
+class QtShaderLight(ShaderLight, QtRigid3dObject):
     "Qt shader light object"
 
     def __init__(
@@ -738,9 +716,11 @@ class QtShaderLight(PureShaderLight):
         #
         self.attenuation = attenuation
 
-    def setPosition(self, **kwargs):
+    def setPosition(self, pos: QVector3D):
         ""
-        self.position = kwargs["vec"]
+        self.check_coordinate_proc(pos)
+        self.position = pos
+        self.updateVectors()
         self.diffuse.setPosition(**kwargs)
         self.specular.setPosition(**kwargs)
 

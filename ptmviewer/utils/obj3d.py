@@ -15,8 +15,96 @@ from PySide2.QtGui import QVector3D
 from PySide2.QtGui import QMatrix4x4
 from PySide2.QtGui import QVector4D
 
+from abc import ABC, abstractmethod
 
-class PureRigid3dObject:
+
+class AbstractRigid3dObject(ABC):
+    "Abstract rigid 3d object"
+
+    def __init__(self):
+        self.position = {"x": 0.0, "y": 0.0, "z": 0.0}
+        self.front = None
+        self.worldUp = {"x": 0.0, "y": 1.0, "z": 0.0}
+        # up with respect to center of the world
+        self.up = None  # with respect to the objects current position
+        self.right = None  # with respect to the objects current position
+
+        # Euler angles for rotation
+        self.yaw = -90.0  # rotation over z axis
+        self.pitch = 0.0  # rotation over y axis
+        self.roll = 0.0  # rotation over x axis
+
+        # movement
+        self.movementSensitivity = 0.001
+        self.movementSpeed = 2.5
+        self.availableMoves = ["+z", "-z", "+x", "-x", "+y", "-y"]
+
+    @property
+    @abstractmethod
+    def z_axis_rotation_matrix(self):
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def y_axis_rotation_matrix(self):
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def x_axis_rotation_matrix(self):
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def rotation_matrix(self):
+        raise NotImplementedError
+
+    @abstractmethod
+    def updateVectors(self):
+        raise NotImplementedError
+
+    @abstractmethod
+    def move(self, direction: str, deltaTime: float):
+        raise NotImplementedError
+
+    @abstractmethod
+    def setPosition(self, pos):
+        raise NotImplementedError
+
+    @abstractmethod
+    def setWorldUp(self, pos):
+        raise NotImplementedError
+
+    def check_angle(self, angle: float, angle_name: str):
+        "check angle if it is in correct type and value"
+        if isinstance(angle, float) is False:
+            raise TypeError(angle_name + " value must be float: " + str(type(angle)))
+        if angle < -360.0:
+            raise ValueError(
+                angle_name + " value can not be lower than -360: " + str(angle)
+            )
+        if angle > 360.0:
+            raise ValueError(
+                angle_name + " value can not be higher than 360: " + str(angle)
+            )
+
+    def setYaw(self, val: float):
+        "Set yaw value"
+        self.check_angle(angle=val, angle_name="yaw")
+        self.updateVectors()
+
+    def setPitch(self, val: float):
+        "Set yaw value"
+        self.check_angle(angle=val, angle_name="pitch")
+        self.updateVectors()
+
+    def setRoll(self, val: float):
+        "Set yaw value"
+        self.check_angle(angle=val, angle_name="roll")
+        self.updateVectors()
+
+
+class PureRigid3dObject(AbstractRigid3dObject):
     "Basic rigid body in 3d world"
 
     def __init__(self):
@@ -98,8 +186,9 @@ class PureRigid3dObject:
         self.right = {"x": self.right[0], "y": self.right[1], "z": self.right[2]}
         self.up = {"x": self.up[0], "y": self.up[1], "z": self.up[2]}
 
+    @staticmethod
     def translateVec(
-        self, axisVector: dict, positionVector: dict, velocity: float, isPlus=True
+        axisVector: dict, positionVector: dict, velocity: float, isPlus=True
     ) -> dict:
         "Translate vector towards axis vector with velocity and position vector"
         atpl = tuple(axisVector.values())
@@ -171,21 +260,6 @@ class PureRigid3dObject:
         self.position = self.move2pos(direction, deltaTime)
         self.updateVectors()
 
-    def setYaw(self, yaw: float):
-        "set yaw value"
-        self.yaw = yaw
-        self.updateVectors()
-
-    def setPitch(self, pitch: float):
-        "set pitch value"
-        self.pitch = pitch
-        self.updateVectors()
-
-    def setRoll(self, roll: float):
-        "set roll value"
-        self.roll = roll
-        self.updateVectors()
-
     def check_coordinate_proc(self, pos: dict):
         "check coordinate type and value"
         if not isinstance(pos, dict):
@@ -212,7 +286,7 @@ class PureRigid3dObject:
         self.updateVectors()
 
 
-class QtRigid3dObject(PureRigid3dObject):
+class QtRigid3dObject(AbstractRigid3dObject):
     "Rigid 3d object with qt constructs"
 
     def __init__(self):
@@ -308,6 +382,11 @@ class QtRigid3dObject(PureRigid3dObject):
         elif direction == "-y":
             pos -= self.up * velocity
         return pos
+
+    def move(self, direction: str, deltaTime: float):
+        "move object to its new position"
+        self.position = self.move2pos(direction, deltaTime)
+        self.updateVectors()
 
     def check_coordinate_proc(self, pos: QVector3D):
         "check coordinate type and value"
