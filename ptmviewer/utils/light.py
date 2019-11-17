@@ -573,7 +573,8 @@ class QtShaderLight(AbstractShaderLight, QtRigid3dObject):
         specular=QtLightSource(),
     ):
         ""
-        super().__init__()
+        QtRigid3dObject.__init__(self)
+        AbstractShaderLight.__init__(self)
         self.set_position(position)
         self.set_cut_off(cutOff)
         self.set_outer_cut_off(outerCutOff)

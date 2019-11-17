@@ -67,6 +67,9 @@ class AppWindowInit(Ui_MainWindow):
         self.cact = self.prepDockWidget(
             txt="color controller", keyseq="ctrl+z", dockWidget=self.colorDock
         )
+        self.sact = self.prepDockWidget(
+            txt="shader controller", keyseq="ctrl+s", dockWidget=self.shaderDock
+        )
         # self.toolbar.addAction(self.cact)
         self.ract = self.prepDockWidget(
             txt="rotation controller", keyseq="ctrl+r", dockWidget=self.rotateDock
@@ -92,7 +95,93 @@ class AppWindowInit(Ui_MainWindow):
         # self.toolbar.addAction(self.gact)
 
 
-class AppWindowFinal(AppWindowInit):
+class AppWindowGLEvents(AppWindowInit):
+    def __init__(self):
+        super().__init__()
+
+    def get_intensity_values(self) -> dict:
+        "get intensity values from spin boxes"
+        ambient = self.viewerWidget.lamp.ambient.intensity
+        diffuse = self.viewerWidget.lamp.diffuse.intensity
+        specular = self.viewerWidget.lamp.specular.intensity
+        return {
+            "intensities": {
+                "ambient": ambient,
+                "diffuse": diffuse,
+                "specular": specular,
+            }
+        }
+
+    def get_coefficient_values(self):
+        "get coefficient values"
+        ambient = self.viewerWidget.lamp.ambient.coeffs
+        diffuse = self.viewerWidget.lamp.diffuse.coeffs
+        specular = self.viewerWidget.lamp.specular.coeffs
+        return {
+            "coefficients": {
+                "ambient": ambient,
+                "diffuse": diffuse,
+                "specular": specular,
+            }
+        }
+
+    def get_lamp_parameters(self) -> dict:
+        "get lamp parameters"
+        pos = self.viewerWidget.lamp.position
+        position = {"position": {"x": pos.x(), "y": pos.y(), "z": pos.z()}}
+        frt = self.viewerWidget.lamp.front
+        front = {"front": {"x": frt.x(), "y": frt.y(), "z": frt.z()}}
+        upl = self.viewerWidget.lamp.up
+        up = {"up": {"x": upl.x(), "y": upl.y(), "z": upl.z()}}
+        rgt = self.viewerWidget.lamp.right
+        right = {"right": {"x": rgt.x(), "y": rgt.y(), "z": rgt.z()}}
+        yaw = self.viewerWidget.lamp.yaw
+        pitch = self.viewerWidget.lamp.pitch
+        roll = self.viewerWidget.lamp.roll
+        angles = {"angles": {"yaw": yaw, "pitch": pitch, "roll": roll}}
+        atten = self.viewerWidget.lamp.attenuation
+        attenuation = {
+            "attenuation": {
+                "constant": atten.x(),
+                "linear": atten.y(),
+                "quadratic": atten.z(),
+            }
+        }
+        params = {}
+        params.update(position)
+        params.update(front)
+        params.update(up)
+        params.update(right)
+        params.update(angles)
+        params.update(attenuation)
+        params["lightCutOff"] = self.viewerWidget.lamp.cutOff
+        params["lightOuterCutOff"] = self.viewerWidget.lamp.outerCutOff
+        return params
+
+    def get_camera_parameters(self) -> dict:
+        "get camera parameters"
+        pos = self.viewerWidget.camera.position
+        position = {"position": {"x": pos.x(), "y": pos.y(), "z": pos.z()}}
+        frt = self.viewerWidget.camera.front
+        front = {"front": {"x": frt.x(), "y": frt.y(), "z": frt.z()}}
+        upl = self.viewerWidget.camera.up
+        up = {"up": {"x": upl.x(), "y": upl.y(), "z": upl.z()}}
+        rgt = self.viewerWidget.camera.right
+        right = {"right": {"x": rgt.x(), "y": rgt.y(), "z": rgt.z()}}
+        yaw = self.viewerWidget.camera.yaw
+        pitch = self.viewerWidget.camera.pitch
+        roll = self.viewerWidget.camera.roll
+        angles = {"angles": {"yaw": yaw, "pitch": pitch, "roll": roll}}
+        params = {}
+        params.update(position)
+        params.update(front)
+        params.update(up)
+        params.update(right)
+        params.update(angles)
+        return params
+
+
+class AppWindowFinal(AppWindowGLEvents):
     "Final window"
 
     def __init__(self):
@@ -133,18 +222,23 @@ class AppWindowFinal(AppWindowInit):
         self.rotZ.valueChanged.connect(lambda x: x)
         ## color widget
         ### Available buttons
-        self.colorR.valueChanged.connect(lambda x: x)
-        self.colorG.valueChanged.connect(lambda x: x)
-        self.colorB.valueChanged.connect(lambda x: x)
-        self.rotAngle.valueChanged.connect(lambda x: x)
-        self.shinSpin.valueChanged.connect(lambda x: x)
-        self.ambientCoeff.valueChanged.connect(lambda x: x)
+        self.ambientRBtn.toggled.connect(lambda x: x)
+        self.diffuseRBtn.toggled.connect(lambda x: x)
+        self.specularRBtn.toggled.connect(lambda x: x)
+        self.intensityR.valueChanged.connect(lambda x: x)
+        self.intensityG.valueChanged.connect(lambda x: x)
+        self.intensityB.valueChanged.connect(lambda x: x)
+        self.coefficientR.valueChanged.connect(lambda x: x)
+        self.coefficientG.valueChanged.connect(lambda x: x)
+        self.coefficientB.valueChanged.connect(lambda x: x)
+
         ## file list widget
         ### Available buttons
         self.addFile.clicked.connect(lambda x: x)
         self.loadFile.clicked.connect(lambda x: x)
         self.removeFile.clicked.connect(lambda x: x)
-        ## gl info widget
+        ## shader widget
+        self.shinSpin.valueChanged.connect(lambda x: x)
 
         # viewer widget, opengl widgets with different shaders
         self.availableGlWidgets = {
@@ -246,14 +340,14 @@ class AppWindowFinal(AppWindowInit):
 
     def getParams(self) -> dict:
         "Get parameters from widgets"
-        red = self.colorR.value()
-        green = self.colorG.value()
-        blue = self.colorB.value()
-        rotation_angle = self.rotAngle.value()
+        red = self.intensityR.value()
+        green = self.intensityG.value()
+        blue = self.intensityB.value()
+        red_coeff = self.coefficientR.value()
+        green_coeff = self.coefficientG.value()
+        blue_coeff = self.coefficientB.value()
         shininess = self.shinSpin.value()
-        ambient_coeff = self.ambientCoeff.value()
         light_position = self.viewerWidget.lamp.position
-        light_direction = self.viewerWidget.lamp.direction
         light_attenuation = self.viewerWidget.lamp.attenuation
         light_cutoff = self.viewerWidget.lamp.cutOff
         camera_position = self.viewerWidget.camera.position
@@ -330,7 +424,6 @@ class AppWindowFinal(AppWindowInit):
         if fpath:
             with open(fpath, "w", encoding="utf-8", newline="\n") as fd:
                 fd.write(text)
-
 
     ### Standard Gui Elements ###
 

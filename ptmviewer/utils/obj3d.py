@@ -350,9 +350,9 @@ class QtRigid3dObject(AbstractRigid3dObject):
         frontZ = math.sin(yawRadian) * pitchCos
         self.front = QVector3D(frontX, frontY, frontZ)
         self.front.normalize()
-        self.right = self.front.crossProduct(self.worldUp)
+        self.right = QVector3D.crossProduct(self.front, self.worldUp)
         self.right.normalize()
-        self.up = self.right.crossProduct(self.front)
+        self.up = QVector3D.crossProduct(self.right, self.front)
         self.up.normalize()
 
     def move2pos(self, direction: str, deltaTime: float):

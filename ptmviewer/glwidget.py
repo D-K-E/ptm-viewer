@@ -35,7 +35,7 @@ from PySide2 import QtCore
 
 from PySide2.shiboken2 import VoidPtr
 from ptmviewer.utils.camera import QtCamera
-from ptmviewer.utils.light import QtLightSource
+from ptmviewer.utils.light import QtShaderLight
 from ptmviewer.utils.shaders import shaders
 
 try:
@@ -141,7 +141,7 @@ class AbstractPointLightPtmGLWidget(AbstractGLWidgetHelper):
         self.camera.movementSensitivity = 0.05
 
         # light source: point light
-        self.lamp = QtLightSource()
+        self.lamp = QtShaderLight()
         self.shininess = 30.0
         self.ambientCoeff = 0.2
 
@@ -298,32 +298,7 @@ class AbstractPointLightPtmGLWidget(AbstractGLWidgetHelper):
         self.worldLimitDepthNeg = -20.0
         self.worldLimitDepthPos = 20.0
 
-    def moveCamera(self, direction: str):
-        "Move camera to certain direction and update gl widget"
-        self.camera.move(direction, deltaTime=0.05)
-        pos = self.camera.position
-        pos = self.limitMovement(pos)
-        self.camera.setPosition(pos)
-        self.update()
-
-    def turnAround(self, x: float, y: float):
-        ""
-        self.camera.lookAround(xoffset=x, yoffset=y, pitchBound=True)
-        self.update()
-
-    def changeShininess(self, val: float):
-        "set a new shininess value to cube fragment shader"
-        self.shininess = val
-        self.update()
-
-    def moveLight(self, direction: str):
-        "Translate light position vector to a new position"
-        currentPos = self.lamp.position
-        newpos = self.limitMovement(newpos)
-        self.lamp.setPosition(vec=newpos)
-        self.update()
-
-    def limitMovement(self, pos: QVector3D):
+    def limit_movement(self, pos: QVector3D):
         "Limit position with respect to world limit"
         px = pos.x()
         py = pos.y()
@@ -342,14 +317,23 @@ class AbstractPointLightPtmGLWidget(AbstractGLWidgetHelper):
             pos.setZ(self.worldLimitDepthNeg)
         return pos
 
-    def rotateLight(self, xval: float, yval: float, zval: float):
-        ""
-        newRotVec = QVector3D(xval, yval, zval)
-        self.rotVectorLamp = newRotVec
-        self.lamp.setDirection(vec=newRotVec)
+    # lamp methods
+    def move_light(self, direction: str):
+        "Translate light position vector to a new position"
+        self.lamp.move(direction, deltaTime=0.05)
+        pos = self.lamp.position
+        newpos = self.limit_movement(pos)
+        self.lamp.set_position(newpos)
         self.update()
 
-    def changeLampIntensity(self, channel: str, val: float):
+    def set_euler_angles_to_lamp(self, yaw: float, pitch: float, roll: float):
+        ""
+        self.lamp.set_yaw(yaw)
+        self.lamp.set_pitch(pitch)
+        self.lamp.set_roll(roll)
+        self.update()
+
+    def change_lamp_diffuse_intensity(self, channel: str, val: float):
         ""
         availables = ["red", "green", "blue"]
         if channel not in availables:
@@ -357,15 +341,88 @@ class AbstractPointLightPtmGLWidget(AbstractGLWidgetHelper):
             mess += ", available channels are: "
             mess += "red, green, blue"
             raise ValueError(mess)
-        self.lamp.setIntensity(channel=channel, val=val)
+        self.lamp.set_channel_intensity(channel=channel, val=val, lsource="diffuse")
         self.update()
 
-    def changeAmbientCoeff(self, val: float):
-        self.ambientCoeff = val
+    def change_lamp_specular_intensity(self, channel: str, val: float):
+        ""
+        availables = ["red", "green", "blue"]
+        if channel not in availables:
+            mess = "Unknown channel name " + channel
+            mess += ", available channels are: "
+            mess += "red, green, blue"
+            raise ValueError(mess)
+        self.lamp.set_channel_intensity(channel=channel, val=val, lsource="specular")
         self.update()
 
-    def setRotationAngle(self, val: float):
-        self.rotationAngle = val
+    def change_lamp_ambient_intensity(self, channel: str, val: float):
+        ""
+        availables = ["red", "green", "blue"]
+        if channel not in availables:
+            mess = "Unknown channel name " + channel
+            mess += ", available channels are: "
+            mess += "red, green, blue"
+            raise ValueError(mess)
+        self.lamp.set_channel_intensity(channel=channel, val=val, lsource="ambient")
+        self.update()
+
+    def change_lamp_diffuse_coefficient(self, channel: str, val: float):
+        "lamp diffuse coefficient"
+        availables = ["red", "green", "blue"]
+        if channel not in availables:
+            mess = "Unknown channel name " + channel
+            mess += ", available channels are: "
+            mess += "red, green, blue"
+            raise ValueError(mess)
+        self.lamp.set_channel_coeff(channel=channel, val=val, lsource="diffuse")
+        self.update()
+
+    def change_lamp_specular_coefficient(self, channel: str, val: float):
+        "lamp diffuse coefficient"
+        availables = ["red", "green", "blue"]
+        if channel not in availables:
+            mess = "Unknown channel name " + channel
+            mess += ", available channels are: "
+            mess += "red, green, blue"
+            raise ValueError(mess)
+        self.lamp.set_channel_coeff(channel=channel, val=val, lsource="specular")
+        self.update()
+
+    def change_lamp_ambient_coefficient(self, channel: str, val: float):
+        "lamp diffuse coefficient"
+        availables = ["red", "green", "blue"]
+        if channel not in availables:
+            mess = "Unknown channel name " + channel
+            mess += ", available channels are: "
+            mess += "red, green, blue"
+            raise ValueError(mess)
+        self.lamp.set_channel_coeff(channel=channel, val=val, lsource="ambient")
+        self.update()
+
+    # camera methods
+    def move_camera(self, direction: str):
+        "Move camera to certain direction and update gl widget"
+        self.camera.move(direction, deltaTime=0.05)
+        pos = self.camera.position
+        pos = self.limit_movement(pos)
+        self.camera.set_position(pos)
+        self.update()
+
+    def set_euler_angles_to_camera(self, yaw: float, pitch: float, roll: float):
+        "set euler angles to camera"
+        self.camera.set_yaw(yaw)
+        self.camera.set_pitch(pitch)
+        self.camera.set_roll(roll)
+        self.update()
+
+    def turn_camera_around(self, x: float, y: float):
+        ""
+        self.camera.lookAround(xoffset=x, yoffset=y, pitchBound=True)
+        self.update()
+
+    def change_shininess(self, val: float):
+        "set a new shininess value to cube fragment shader"
+        self.shininess = val
         self.update()
 
     def createTextures(self):
@@ -611,7 +668,7 @@ class PtmLambertianGLWidget(AbstractPointLightPtmGLWidget):
         )
         viewMatrix = self.camera.getViewMatrix()
         model = QMatrix4x4()
-        color = self.lamp.color
+        color = self.lamp.diffuse.color
         pos = self.lamp.position
         self.program.setUniformValue("projection", projectionMatrix)
         self.program.setUniformValue("view", viewMatrix)
@@ -632,12 +689,13 @@ class PtmLambertianGLWidget(AbstractPointLightPtmGLWidget):
         )
         viewMatrix = self.camera.getViewMatrix()
         lampModel = QMatrix4x4()
-        lampModel.translate(self.lamp.position)
-        lampModel.rotate(self.rotationAngle, self.rotVectorLamp)
+        rotmat = self.lamp.rotation_matrix
+        pos = rotmat * self.lamp.position
+        lampModel.translate(pos)
         self.lampProgram.setUniformValue("projection", projectionMatrix)
         self.lampProgram.setUniformValue("view", viewMatrix)
         self.lampProgram.setUniformValue("model", lampModel)
-        self.lampProgram.setUniformValue("lightColor", self.lamp.color)
+        self.lampProgram.setUniformValue("lightColor", self.lamp.diffuse.color)
 
 
 class PtmNormalMapGLWidget(PtmLambertianGLWidget):
@@ -882,16 +940,16 @@ class PtmNormalMapGLWidget(PtmLambertianGLWidget):
         )
         viewMatrix = self.camera.getViewMatrix()
         model = QMatrix4x4()
-        color = self.lamp.color
+        color = self.lamp.diffuse.color
         pos = self.lamp.position
         self.program.setUniformValue("projection", projectionMatrix)
         self.program.setUniformValue("view", viewMatrix)
         self.program.setUniformValue("model", model)
         self.program.setUniformValue("lightPos", self.lamp.position)
         self.program.setUniformValue("viewPos", self.camera.position)
-        self.program.setUniformValue("ambientCoeff", self.ambientCoeff)
+        self.program.setUniformValue("ambientCoeff", self.lamp.ambient.coeffs)
         self.program.setUniformValue("shininess", self.shininess)
-        self.program.setUniformValue("lightColor", self.lamp.color)
+        self.program.setUniformValue("lightColor", self.lamp.diffuse.color)
 
 
 class PtmPerChannelNormalMapGLWidget(PtmNormalMapGLWidget):
@@ -1000,20 +1058,20 @@ class PtmPerChannelNormalMapPhongGLWidget(PtmNormalMapGLWidget):
         )
         viewMatrix = self.camera.getViewMatrix()
         model = QMatrix4x4()
-        color = self.lamp.color
+        color = self.lamp.diffuse.color
         pos = self.lamp.position
         self.program.setUniformValue("projection", projectionMatrix)
         self.program.setUniformValue("view", viewMatrix)
         self.program.setUniformValue("model", model)
         self.program.setUniformValue("viewerPosition", self.camera.position)
         self.program.setUniformValue("light.position", pos)
-        self.program.setUniformValue("light.direction", self.lamp.direction)
+        self.program.setUniformValue("light.direction", self.lamp.front)
         self.program.setUniformValue("light.color", color)
         self.program.setUniformValue("light.attenuation", self.lamp.attenuation)
         self.program.setUniformValue("light.cutOff", self.lamp.cutOff)
         self.program.setUniformValue("light.outerCutOff", self.lamp.outerCutOff)
         self.program.setUniformValue("material.shininess", self.shininess)
-        self.program.setUniformValue("ambientCoeff", self.ambientCoeff)
+        self.program.setUniformValue("ambientCoeff", self.lamp.ambient.coeffs)
 
 
 class PtmPerChannelNormalMapDirGLWidget(PtmPerChannelNormalMapGLWidget):
@@ -1043,19 +1101,16 @@ class PtmPerChannelNormalMapDirGLWidget(PtmPerChannelNormalMapGLWidget):
         )
         viewMatrix = self.camera.getViewMatrix()
         model = QMatrix4x4()
-        color = self.lamp.color
+        color = self.lamp.diffuse.color
         pos = self.lamp.position
         self.program.setUniformValue("projection", projectionMatrix)
         self.program.setUniformValue("view", viewMatrix)
         self.program.setUniformValue("model", model)
         self.program.setUniformValue("viewPos", self.camera.position)
-        self.program.setUniformValue("light.direction", self.lamp.direction)
+        self.program.setUniformValue("light.direction", self.lamp.front)
         self.program.setUniformValue("light.color", color)
         self.program.setUniformValue("material.shininess", self.shininess)
-        self.program.setUniformValue(
-            "ambient",
-            QVector3D(self.ambientCoeff, self.ambientCoeff, self.ambientCoeff),
-        )
+        self.program.setUniformValue("ambient", self.lamp.ambient.coeffs)
 
 
 class PtmPerChannelNormalMapPointGLWidget(PtmPerChannelNormalMapGLWidget):
@@ -1085,7 +1140,7 @@ class PtmPerChannelNormalMapPointGLWidget(PtmPerChannelNormalMapGLWidget):
         )
         viewMatrix = self.camera.getViewMatrix()
         model = QMatrix4x4()
-        color = self.lamp.color
+        color = self.lamp.diffuse.color
         pos = self.lamp.position
         self.program.setUniformValue("projection", projectionMatrix)
         self.program.setUniformValue("view", viewMatrix)
@@ -1096,10 +1151,7 @@ class PtmPerChannelNormalMapPointGLWidget(PtmPerChannelNormalMapGLWidget):
         self.program.setUniformValue("light.attenuation", self.lamp.attenuation)
 
         self.program.setUniformValue("material.shininess", self.shininess)
-        self.program.setUniformValue(
-            "ambient",
-            QVector3D(self.ambientCoeff, self.ambientCoeff, self.ambientCoeff),
-        )
+        self.program.setUniformValue("ambient", self.lamp.ambient.coeffs)
 
 
 class PtmPerChannelNormalMapSpotGLWidget(PtmPerChannelNormalMapGLWidget):
@@ -1129,24 +1181,21 @@ class PtmPerChannelNormalMapSpotGLWidget(PtmPerChannelNormalMapGLWidget):
         )
         viewMatrix = self.camera.getViewMatrix()
         model = QMatrix4x4()
-        color = self.lamp.color
+        color = self.lamp.diffuse.color
         pos = self.lamp.position
         self.program.setUniformValue("projection", projectionMatrix)
         self.program.setUniformValue("view", viewMatrix)
         self.program.setUniformValue("model", model)
         self.program.setUniformValue("viewPos", self.camera.position)
         self.program.setUniformValue("light.position", pos)
-        self.program.setUniformValue("light.direction", self.lamp.direction)
+        self.program.setUniformValue("light.direction", self.lamp.front)
         self.program.setUniformValue("light.color", color)
         self.program.setUniformValue("light.attenuation", self.lamp.attenuation)
         self.program.setUniformValue("light.cutOff", self.lamp.cutOff)
         self.program.setUniformValue("light.outerCutOff", self.lamp.outerCutOff)
 
         self.program.setUniformValue("material.shininess", self.shininess)
-        self.program.setUniformValue(
-            "ambient",
-            QVector3D(self.ambientCoeff, self.ambientCoeff, self.ambientCoeff),
-        )
+        self.program.setUniformValue("ambient", self.lamp.ambient.coeffs)
 
 
 class PtmCoefficientShader(AbstractPointLightPtmGLWidget):
@@ -1183,8 +1232,9 @@ class PtmCoefficientShader(AbstractPointLightPtmGLWidget):
         )
         viewMatrix = self.camera.getViewMatrix()
         lampModel = QMatrix4x4()
-        lampModel.translate(self.lamp.position)
-        lampModel.rotate(self.rotationAngle, self.rotVectorLamp)
+        rotmat = self.lamp.rotation_matrix
+        pos = rotmat * self.lamp.position
+        lampModel.translate(pos)
         lampModel.scale(0.1)
         self.lampProgram.setUniformValue("projection", projectionMatrix)
         self.lampProgram.setUniformValue("view", viewMatrix)
@@ -1203,12 +1253,12 @@ class PtmCoefficientShader(AbstractPointLightPtmGLWidget):
         self.program.setUniformValue("model", model)
         self.program.setUniformValue("viewPos", self.camera.position)
         self.program.setUniformValue("lightPos", self.lamp.position)
-        self.program.setUniformValue("lightColor", self.lamp.color)
+        self.program.setUniformValue("lightColor", self.lamp.diffuse.color)
         self.program.setUniformValue("attc", self.lamp.attenuation)
         self.program.setUniformValue("blinn", self.isBlinn)
-        self.program.setUniformValue("diffuseCoeffs", self.lamp.coeffs)
-        self.program.setUniformValue("specularCoeffs", self.lamp.coeffs)
-        self.program.setUniformValue("ambientCoeffs", QVector3D(0.2, 0.2, 0.2))
+        self.program.setUniformValue("diffuseCoeffs", self.lamp.diffuse.coeffs)
+        self.program.setUniformValue("specularCoeffs", self.lamp.specular.coeffs)
+        self.program.setUniformValue("ambientCoeffs", self.lamp.ambient.coeffs)
 
     def createTextures(self):
         "no texture in this shader"
