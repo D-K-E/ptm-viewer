@@ -50,7 +50,7 @@ class PureCamera(PureRigid3dObject, AbstractCamera):
         self.zoom = 45.0
 
         # update camera vectors
-        self.updateVectors()
+        self.update_vectors()
 
     def lookAround(self, xoffset: float, yoffset: float, pitchBound: bool):
         "Look around with camera"
@@ -65,7 +65,7 @@ class PureCamera(PureRigid3dObject, AbstractCamera):
             elif self.pitch < -90.0:
                 self.pitch = -90.0
         #
-        self.updateVectors()
+        self.update_vectors()
 
     def zoomInOut(self, yoffset: float, zoomBound=45.0):
         "Zoom with camera"
@@ -99,7 +99,7 @@ class PureCamera(PureRigid3dObject, AbstractCamera):
         self.movementSensitivity = sensitivity
         self.front = front
         self.zoom = zoom
-        self.updateVectors()
+        self.update_vectors()
 
     def setCameraWithFloatVals(
         self,
@@ -126,7 +126,7 @@ class PureCamera(PureRigid3dObject, AbstractCamera):
         self.movementSensitivity = sensitivity
         self.zoom = zoom
         self.front = front
-        self.updateVectors()
+        self.update_vectors()
 
     def getViewMatrix(self):
         "Obtain view matrix for camera"
@@ -176,7 +176,7 @@ class QtCamera(QtRigid3dObject, AbstractCamera):
             elif self.pitch < -89.9:
                 self.pitch = -89.9
         #
-        self.updateCameraVectors()
+        self.update_vectors()
 
     def zoomInOut(self, yoffset: float, zoomBound=45.0):
         "Zoom with camera"
@@ -213,7 +213,7 @@ class QtCamera(QtRigid3dObject, AbstractCamera):
         self.movementSpeed = speed
         self.movementSensitivity = sensitivity
         self.zoom = zoom
-        self.updateVectors()
+        self.update_vectors()
 
     def setCameraWithFloatVals(
         self,
@@ -237,7 +237,7 @@ class QtCamera(QtRigid3dObject, AbstractCamera):
         self.movementSpeed = speed
         self.movementSensitivity = sensitivity
         self.zoom = zoom
-        self.updateVectors()
+        self.update_vectors()
 
     def __str__(self):
         "string representation"

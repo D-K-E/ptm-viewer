@@ -60,7 +60,7 @@ class AbstractRigid3dObject(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def updateVectors(self):
+    def update_vectors(self):
         raise NotImplementedError
 
     @abstractmethod
@@ -68,11 +68,11 @@ class AbstractRigid3dObject(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def setPosition(self, pos):
+    def set_position(self, pos):
         raise NotImplementedError
 
     @abstractmethod
-    def setWorldUp(self, pos):
+    def set_world_up(self, pos):
         raise NotImplementedError
 
     def check_angle(self, angle: float, angle_name: str):
@@ -88,20 +88,20 @@ class AbstractRigid3dObject(ABC):
                 angle_name + " value can not be higher than 360: " + str(angle)
             )
 
-    def setYaw(self, val: float):
+    def set_yaw(self, val: float):
         "Set yaw value"
         self.check_angle(angle=val, angle_name="yaw")
-        self.updateVectors()
+        self.update_vectors()
 
-    def setPitch(self, val: float):
+    def set_pitch(self, val: float):
         "Set yaw value"
         self.check_angle(angle=val, angle_name="pitch")
-        self.updateVectors()
+        self.update_vectors()
 
-    def setRoll(self, val: float):
+    def set_roll(self, val: float):
         "Set yaw value"
         self.check_angle(angle=val, angle_name="roll")
-        self.updateVectors()
+        self.update_vectors()
 
 
 class PureRigid3dObject(AbstractRigid3dObject):
@@ -167,7 +167,7 @@ class PureRigid3dObject(AbstractRigid3dObject):
         )
         return mat2matDot(mat1=self.z_axis_rotation_matrix, mat2=mat2)
 
-    def updateVectors(self):
+    def update_vectors(self):
         "update front, up, right vectors"
         yawRadian = math.radians(self.yaw)
         yawCos = math.cos(yawRadian)
@@ -258,7 +258,7 @@ class PureRigid3dObject(AbstractRigid3dObject):
     def move(self, direction: str, deltaTime: float):
         "move object to its new position"
         self.position = self.move2pos(direction, deltaTime)
-        self.updateVectors()
+        self.update_vectors()
 
     def check_coordinate_proc(self, pos: dict):
         "check coordinate type and value"
@@ -273,17 +273,17 @@ class PureRigid3dObject(AbstractRigid3dObject):
         if not all([isinstance(v, float) for v in pvals]):
             raise TypeError("Given coordinates do not have proper type float")
 
-    def setWorldUp(self, wup: dict):
+    def set_world_up(self, wup: dict):
         "world up"
         self.check_coordinate_proc(wup)
         self.worldUp = wup
-        self.updateVectors()
+        self.update_vectors()
 
-    def setPosition(self, pos: dict):
+    def set_position(self, pos: dict):
         "set position"
         self.check_coordinate_proc(pos)
         self.position = pos
-        self.updateVectors()
+        self.update_vectors()
 
 
 class QtRigid3dObject(AbstractRigid3dObject):
@@ -339,7 +339,7 @@ class QtRigid3dObject(AbstractRigid3dObject):
         mat2 = self.y_axis_rotation_matrix * self.x_axis_rotation_matrix
         return self.z_axis_rotation_matrix * mat2
 
-    def updateVectors(self):
+    def update_vectors(self):
         "override base class"
         yawRadian = math.radians(self.yaw)
         yawCos = math.cos(yawRadian)
@@ -386,7 +386,7 @@ class QtRigid3dObject(AbstractRigid3dObject):
     def move(self, direction: str, deltaTime: float):
         "move object to its new position"
         self.position = self.move2pos(direction, deltaTime)
-        self.updateVectors()
+        self.update_vectors()
 
     def check_coordinate_proc(self, pos: QVector3D):
         "check coordinate type and value"
@@ -398,14 +398,14 @@ class QtRigid3dObject(AbstractRigid3dObject):
         if not all([isinstance(v, float) for v in pvals]):
             raise TypeError("Given coordinates do not have proper type float")
 
-    def setWorldUp(self, wup: QVector3D):
+    def set_world_up(self, wup: QVector3D):
         "world up"
         self.check_coordinate_proc(wup)
         self.worldUp = wup
-        self.updateVectors()
+        self.update_vectors()
 
-    def setPosition(self, pos: QVector3D):
+    def set_position(self, pos: QVector3D):
         "set position"
         self.check_coordinate_proc(pos)
         self.position = pos
-        self.updateVectors()
+        self.update_vectors()

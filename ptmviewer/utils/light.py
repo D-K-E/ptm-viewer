@@ -12,6 +12,7 @@ from ptmviewer.utils.utils import computeFrontRightPure
 from ptmviewer.utils.utils import computeFrontRightQt
 from ptmviewer.utils.obj3d import PureRigid3dObject
 from ptmviewer.utils.obj3d import QtRigid3dObject
+from ptmviewer.utils.obj3d import AbstractRigid3dObject
 
 from abc import ABC, abstractmethod
 
@@ -448,304 +449,135 @@ class PureLambertianReflectorAmbient(PureLambertianReflector):
         self.reflection = {"r": red, "g": green, "b": blue}
 
 
-class ShaderLight:
+class AbstractShaderLight:
+    def __init__(self):
+        self.attenuation = {"constant": 0.0, "linear": 0.0, "quadratic": 0.0}
+        self.ambient = None
+        self.diffuse = None
+        self.specular = None
+        self.availableLightSources = ["ambient", "diffuse", "specular"]
+        self.cutOff = 0.0
+        self.outerCutOff = 0.0
+
+    def set_cut_off(self, val: float):
+        "set cut off value to diffuse and specular"
+        self.diffuse.set_cut_off(val)
+        self.specular.set_cut_off(val)
+        self.cutOff = self.specular.cutOff
+
+    def set_attenuation(self, atten):
+        self.diffuse.set_attenuation(atten)
+        self.specular.set_attenuation(atten)
+        self.attenuation = self.specular.attenuation
+
+    def set_channel_intensity(self, channel: str, val: float, lsource="diffuse"):
+        "channel intensity"
+        if lsource not in self.availableLightSources:
+            raise ValueError("Unavailable light source: " + lsource)
+        if lsource == "diffuse":
+            self.diffuse.set_channel_intensity(channel, val)
+        elif lsource == "specular":
+            self.specular.set_channel_intensity(channel, val)
+        else:
+            self.ambient.set_channel_intensity(channel, val)
+
+    def set_channel_coeff(self, channel: str, val: float, lsource="diffuse"):
+        "channel coefficient"
+        if lsource not in self.availableLightSources:
+            raise ValueError("Unavailable light source: " + lsource)
+        if lsource == "diffuse":
+            self.diffuse.set_channel_coeff(channel, val)
+        elif lsource == "specular":
+            self.specular.set_channel_coeff(channel, val)
+        else:
+            self.ambient.set_channel_coeff(channel, val)
+
+    def set_outer_cut_off(self, val: float):
+        "set cut off value to diffuse and specular"
+        self.diffuse.set_outer_cut_off(val)
+        self.specular.set_outer_cut_off(val)
+        self.outerCutOff = self.specular.outerCutOff
+
+
+class PureShaderLight(AbstractShaderLight, PureRigid3dObject):
     "A Pure python shader light object for illumination"
 
     def __init__(
         self,
-        posx=0.0,
-        posy=1.0,
-        posz=0.0,
-        dirx=0.0,
-        diry=-1.0,
-        dirz=-0.1,
-        attenuationConstant=1.0,
-        attenuationLinear=0.7,
-        attenuationQuadratic=1.8,
+        position: dict,
         cutOff=12.5,
         outerCutOff=15.0,
-        ambient=PureLightSource(
-            intensityRedCoeff=0.3, intensityGreenCoeff=0.3, intensityBlueCoeff=0.3
-        ),
+        attenuation={"constant": 1.0, "linear": 0.7, "quadratic": 1.8},
+        ambient=PureLightSource(coeffs={"r": 0.3, "g": 0.3, "b": 0.3}),
         diffuse=PureLightSource(),
         specular=PureLightSource(),
     ):
         ""
-        self.position = {"x": posx, "y": posy, "z": posz}
-        self.direction = {"x": dirx, "y": diry, "z": dirz}
-        self.attenConst = attenuationConstant
-        self.attenLinear = attenuationLinear
-        self.attenQuad = attenuationQuadratic
+        super().__init__()
         self.ambient = ambient
-        diffuse.setPosition(x=posx, y=posy, z=posz)
-        diffuse.setDirection(x=dirx, y=diry, z=dirz)
-        diffuse.setAttenuation(
-            aConst=attenuationConstant,
-            aLin=attenuationLinear,
-            aQuad=attenuationQuadratic,
-        )
         self.diffuse = diffuse
-        specular.setPosition(x=posx, y=posy, z=posz)
-        specular.setDirection(x=dirx, y=diry, z=dirz)
-        specular.setAttenuation(
-            aConst=attenuationConstant,
-            aLin=attenuationLinear,
-            aQuad=attenuationQuadratic,
-        )
         self.specular = specular
-        self.cutOff = math.cos(math.radians(cutOff))
-        self.outerCutOff = math.cos(math.radians(outerCutOff))
-        self.specular.setCutOff(cutOff)
-        self.diffuse.setCutOff(cutOff)
+        self.set_position(position)
+        self.set_attenuation(attenuation)
+        self.set_cut_off(cutOff)
+        self.set_outer_cut_off(outerCutOff)
 
-    def getPosition(self):
-        return self.position
-
-    def setPosition(self, pos: dict):
-        "set position"
-        x, y, z = pos["x"], pos["y"], pos["z"]
-        self.position = {"x": x, "y": y, "z": z}
-        self.diffuse.setPosition(x=x, y=y, z=z)
-        self.specular.setPosition(x=x, y=y, z=z)
-
-    def getDirection(self):
-        return self.direction
-
-    def setDirection(self, pos: dict):
-        ""
-        x, y, z = pos["x"], pos["y"], pos["z"]
-        self.direction = {"x": x, "y": y, "z": z}
-        self.diffuse.setDirection(x=x, y=y, z=z)
-        self.specular.setDirection(x=x, y=y, z=z)
-
-    def getSpecularColor(self):
+    def get_specular_color(self):
         return {
             "r": self.specular.color["r"],
             "g": self.specular.color["g"],
             "b": self.specular.color["b"],
         }
 
-    def getAmbientColor(self):
+    def get_ambient_color(self):
         return {
             "r": self.ambient.color["r"],
             "g": self.ambient.color["g"],
             "b": self.ambient.color["b"],
         }
 
-    def getDiffuseColor(self):
+    def get_diffuse_color(self):
         return {
             "r": self.diffuse.color["r"],
             "g": self.diffuse.color["g"],
             "b": self.diffuse.color["b"],
         }
 
-    def getCutOff(self):
-        return self.cutOff
-
-    def setCutOff(self, val: float):
-        ""
-        self.cutOff = math.cos(math.radians(val))
-        self.diffuse.setCutOff(val)
-        self.specular.setCutOff(val)
-
-    def setOuterCutOff(self, val: float):
-        ""
-        self.outerCutOff = math.cos(math.radians(val))
-        self.diffuse.setOuterCutOff(val)
-        self.specular.setOuterCutOff(val)
-
-    def setIntensity(self, colorType="all", **kwargs):
-        ""
-        colorType = colorType.lower()
-        if colorType == "specular":
-            self.specular.setIntensity(**kwargs)
-        elif colorType == "diffuse":
-            self.diffuse.setIntensity(**kwargs)
-        elif colorType == "all":
-            self.diffuse.setIntensity(**kwargs)
-            self.specular.setIntensity(**kwargs)
-        else:
-            mess = "Unknown color type " + colorType
-            mess += " known types are specular diffuse"
-            raise ValueError(mess)
-
-    def setCoeffs(self, colorType="all", **kwargs):
-        "Set intensity coefficients"
-        colorType = colorType.lower()
-        if colorType == "specular":
-            self.specular.setCoeffs(**kwargs)
-        elif colorType == "diffuse":
-            self.diffuse.setCoeffs(**kwargs)
-        elif colorType == "all":
-            self.specular.setCoeffs(**kwargs)
-            self.diffuse.setCoeffs(**kwargs)
-        else:
-            mess = "Unknown color type " + colorType
-            mess += " known types are specular, diffuse, all"
-            raise ValueError(mess)
-
-    def setAttenuation(self, colorType="all", **kwargs):
-        ""
-        colorType = colorType.lower()
-        if colorType == "specular":
-            self.specular.setAttenuation(**kwargs)
-        elif colorType == "diffuse":
-            self.diffuse.setAttenuation(**kwargs)
-        elif colorType == "all":
-            self.specular.setAttenuation(**kwargs)
-            self.diffuse.setAttenuation(**kwargs)
-        else:
-            mess = "Unknown color type " + colorType
-            mess += " known types are specular, diffuse, all"
-            raise ValueError(mess)
-
     def __str__(self):
         "string representation"
-        mess = "Shader Light:\n position {0},\n direction {1},\n ambient {2}"
+        mess = "Shader Light:\n position {0},\n ambient {2}"
         mess += ",\n diffuse {3},\n specular {4},\n cut off {5}"
-        mess += ",\n outerCutOff value {9}, attenuation constant {6},"
-        mess += "\n attenuation linear {7}"
-        mess += ",\n attenuation quadratic {8}"
+        mess += ",\n outerCutOff value {9}, attenuation values {6},"
         return mess.format(
             str(self.position),
-            str(self.direction),
             str(self.ambient),
             str(self.diffuse),
             str(self.specular),
             str(self.cutOff),
-            str(self.attenConst),
-            str(self.attenLinear),
-            str(self.attenQuad),
             str(self.outerCutOff),
+            str(self.attenuation),
         )
 
 
-class PureShaderLight(ShaderLight, PureRigid3dObject):
-    "Shader light object for illumination"
-
-    def __init__(
-        self,
-        posx=0.0,
-        posy=1.0,
-        posz=0.0,
-        dirx=0.0,
-        diry=-1.0,
-        dirz=-0.1,
-        attenuationConstant=1.0,
-        attenuationLinear=0.7,
-        attenuationQuadratic=1.8,
-        cutOff=12.5,
-        outerCutOff=15.0,
-        ambient=PureLightSource(
-            intensityRedCoeff=0.3, intensityGreenCoeff=0.3, intensityBlueCoeff=0.3
-        ),
-        diffuse=PureLightSource(),
-        specular=PureLightSource(),
-    ):
-        super().__init__(
-            posx=posx,
-            posy=posy,
-            posz=posz,
-            dirx=dirx,
-            diry=diry,
-            dirz=dirz,
-            attenuationConstant=attenuationConstant,
-            attenuationLinear=attenuationLinear,
-            attenuationQuadratic=attenuationQuadratic,
-            cutOff=cutOff,
-            outerCutOff=outerCutOff,
-            ambient=ambient,
-            diffuse=diffuse,
-            specular=diffuse,
-        )
-
-    def setPosition(self, pos: dict):
-        self.check_coordinate_proc(pos)
-        self.position = pos
-        self.diffuse.setPosition(x=pos["x"], y=pos["y"], z=pos["z"])
-        self.specular.setPosition(x=pos["x"], y=pos["y"], z=pos["z"])
-
-
-class QtShaderLight(ShaderLight, QtRigid3dObject):
+class QtShaderLight(AbstractShaderLight, QtRigid3dObject):
     "Qt shader light object"
 
     def __init__(
         self,
         position=QVector3D(0.0, 1.0, 0.0),
-        direction=QVector3D(0.0, -1.0, -0.1),
-        cutOff=math.cos(math.radians(12.5)),
-        outerCutOff=math.cos(math.radians(15.0)),
+        cutOff=12.5,
+        outerCutOff=15.0,
         attenuation=QVector3D(1.0, 0.14, 1.8),
         ambient=QtLightSource(),
         diffuse=QtLightSource(),
         specular=QtLightSource(),
     ):
         ""
-        super().__init__(
-            posx=position.x(),
-            posy=position.y(),
-            posz=position.z(),
-            dirx=direction.x(),
-            diry=direction.y(),
-            dirz=direction.z(),
-            cutOff=cutOff,
-            attenuationConstant=attenuation.x(),
-            attenuationLinear=attenuation.y(),
-            attenuationQuadratic=attenuation.z(),
-            ambient=ambient.toPureLightSource(),
-            diffuse=QtLightSource().toPureLightSource(),
-            specular=QtLightSource().toPureLightSource(),
-        )
-        self.position = position
-        self.direction = direction
-        self.cutOff = cutOff
-        self.outerCutOff = outerCutOff
+        super().__init__()
+        self.set_position(position)
+        self.set_cut_off(cutOff)
+        self.set_outer_cut_off(outerCutOff)
+        self.set_attenuation(attenuation)
         self.ambient = ambient
-        #
         self.diffuse = diffuse
-        self.diffuse.setPosition(vec=position)
-        self.diffuse.setDirection(vec=direction)
-        self.diffuse.setAttenuation(vec=attenuation)
-        self.diffuse.setCutOff(cutOff)
-        #
         self.specular = specular
-        self.specular.setPosition(vec=position)
-        self.specular.setDirection(vec=direction)
-        self.specular.setAttenuation(vec=attenuation)
-        self.specular.setCutOff(cutOff)
-        #
-        self.attenuation = attenuation
-
-    def setPosition(self, pos: QVector3D):
-        ""
-        self.check_coordinate_proc(pos)
-        self.position = pos
-        self.updateVectors()
-        self.diffuse.setPosition(**kwargs)
-        self.specular.setPosition(**kwargs)
-
-    def setDirection(self, **kwargs):
-        ""
-        self.direction = kwargs["vec"]
-        self.diffuse.setDirection(**kwargs)
-        self.specular.setDirection(**kwargs)
-
-    def getDiffuseColor(self):
-        ""
-        return self.diffuse.color
-
-    def getAmbientColor(self):
-        ""
-        return self.ambient.color
-
-    def getSpecularColor(self):
-        ""
-        return self.specular.color
-
-    def getPosition(self):
-        ""
-        return self.position
-
-    def getDirection(self):
-        ""
-        return self.direction
