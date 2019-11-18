@@ -7,8 +7,9 @@
 import sys
 import ctypes
 import numpy as np
-from typing import Tuple
+from typing import Tuple, List
 
+import pdb
 
 # Opengl drawing related
 from PySide2.QtGui import QVector3D
@@ -143,7 +144,6 @@ class AbstractPointLightPtmGLWidget(AbstractGLWidgetHelper):
         # light source: point light
         self.lamp = QtShaderLight()
         self.shininess = 30.0
-        self.ambientCoeff = 0.2
 
         # shaders
         self.shaders = shaders
@@ -288,8 +288,9 @@ class AbstractPointLightPtmGLWidget(AbstractGLWidgetHelper):
             dtype=ctypes.c_float,
         )
         # fmt: on
-        self.rotVectorLamp = QVector3D(0.1, 0.2, 0.5)
         self.rotationAngle = 45.0
+        self.cameraRotationAngle = 45.0
+        self.rotationAxes = [QVector3D(1.0, 0.0, 0.0)]
         #
         self.worldLimitTop = 3.0  # + imTopY
         self.worldLimitBottom = -3.0  # + imBottomY
@@ -316,6 +317,9 @@ class AbstractPointLightPtmGLWidget(AbstractGLWidgetHelper):
         elif pz < self.worldLimitDepthNeg:
             pos.setZ(self.worldLimitDepthNeg)
         return pos
+
+    def set_rotate_axes(self, axes: List[QVector3D]):
+        self.rotationAxes = axes
 
     # lamp methods
     def move_light(self, direction: str):
@@ -399,6 +403,17 @@ class AbstractPointLightPtmGLWidget(AbstractGLWidgetHelper):
         self.lamp.set_channel_coeff(channel=channel, val=val, lsource="ambient")
         self.update()
 
+    def rotate_lamp(self, angle: float):
+        "rotate lamp using given angle"
+        self.rotationAngle = angle
+        self.update()
+
+    def rotate_lamp_model(self, model: QMatrix4x4):
+        "rotate model with given matrices"
+        for axis in self.rotationAxes:
+            model.rotate(self.rotationAngle, axis)
+        return model
+
     # camera methods
     def move_camera(self, direction: str):
         "Move camera to certain direction and update gl widget"
@@ -406,6 +421,16 @@ class AbstractPointLightPtmGLWidget(AbstractGLWidgetHelper):
         pos = self.camera.position
         pos = self.limit_movement(pos)
         self.camera.set_position(pos)
+        self.update()
+
+    def rotate_camera_model(self, model: QMatrix4x4):
+        "rotate camera model"
+        for axis in self.rotationAxes:
+            model.rotate(self.cameraRotationAngle, axis)
+        return model
+
+    def rotate_camera(self, angle: float):
+        self.cameraRotationAngle = angle
         self.update()
 
     def set_euler_angles_to_camera(self, yaw: float, pitch: float, roll: float):
@@ -670,6 +695,7 @@ class PtmLambertianGLWidget(AbstractPointLightPtmGLWidget):
         model = QMatrix4x4()
         color = self.lamp.diffuse.color
         pos = self.lamp.position
+        # pdb.set_trace()
         self.program.setUniformValue("projection", projectionMatrix)
         self.program.setUniformValue("view", viewMatrix)
         self.program.setUniformValue("model", model)
@@ -689,9 +715,9 @@ class PtmLambertianGLWidget(AbstractPointLightPtmGLWidget):
         )
         viewMatrix = self.camera.getViewMatrix()
         lampModel = QMatrix4x4()
-        rotmat = self.lamp.rotation_matrix
-        pos = rotmat * self.lamp.position
-        lampModel.translate(pos)
+        lampModel.translate(self.lamp.position)
+        lampModel = self.rotate_lamp_model(lampModel)
+        # pdb.set_trace()
         self.lampProgram.setUniformValue("projection", projectionMatrix)
         self.lampProgram.setUniformValue("view", viewMatrix)
         self.lampProgram.setUniformValue("model", lampModel)
@@ -1232,10 +1258,8 @@ class PtmCoefficientShader(AbstractPointLightPtmGLWidget):
         )
         viewMatrix = self.camera.getViewMatrix()
         lampModel = QMatrix4x4()
-        rotmat = self.lamp.rotation_matrix
-        pos = rotmat * self.lamp.position
-        lampModel.translate(pos)
-        lampModel.scale(0.1)
+        lampModel.translate(self.lamp.position)
+        lampModel = self.rotate_lamp_model(lampModel)
         self.lampProgram.setUniformValue("projection", projectionMatrix)
         self.lampProgram.setUniformValue("view", viewMatrix)
         self.lampProgram.setUniformValue("model", lampModel)

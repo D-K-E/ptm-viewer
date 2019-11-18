@@ -181,10 +181,10 @@ class PureLightSource(AbstractLightSource):
 
     def set_channel_coeff(self, channel: str, val: float):
         "Set coefficients"
-        self.check_intensity_coeff(val, channel + " coefficient")
+        self.check_intensity_coeff(val=val, valname=channel + " coefficient")
         #
         name = channel.lower()
-        cdict = self.set_channel_val(channel, val)
+        cdict = PureLightSource.set_channel_val(channel, val)
         self.coeffs.update(cdict)
         self.set_color()
 
@@ -193,7 +193,7 @@ class PureLightSource(AbstractLightSource):
         self.check_intensity_coeff(val, channel + " intensity")
         #
         name = channel.lower()
-        cdict = self.set_channel_val(channel, val)
+        cdict = PureLightSource.set_channel_val(channel, val)
         self.intensity.update(cdict)
         self.set_color()
 
@@ -302,6 +302,7 @@ class QtLightSource(AbstractLightSource):
                 self.intensity.z() * self.coeffs.z(),
                 self.intensity.w() * self.coeffs.w(),
             )
+            self.color = self.color.toVector3DAffine()
 
     def set_channel_val(self, channel: str, val: float, isIntensity=False):
         cvec = self.intensity if isIntensity else self.coeffs
@@ -322,13 +323,13 @@ class QtLightSource(AbstractLightSource):
         self.set_color()
         return
 
-    def set_channel_coeff(self, **kwargs):
+    def set_channel_coeff(self, channel: str, val: float):
         "Set coefficient to given intesity"
-        self.set_channel_val(channel, val, isIntensity=False)
+        self.set_channel_val(channel=channel, val=val, isIntensity=False)
 
-    def set_channel_intensity(self, **kwargs):
+    def set_channel_intensity(self, channel: str, val: float):
         "Set coefficient to given intesity"
-        self.set_channel_val(channel, val, isIntensity=True)
+        self.set_channel_val(channel=channel, val=val, isIntensity=True)
 
     def get_coeff_average(self):
         "get average value for coefficients"
@@ -575,10 +576,15 @@ class QtShaderLight(AbstractShaderLight, QtRigid3dObject):
         ""
         QtRigid3dObject.__init__(self)
         AbstractShaderLight.__init__(self)
+
+        # rigid 3d object
         self.set_position(position)
-        self.set_cut_off(cutOff)
-        self.set_outer_cut_off(outerCutOff)
-        self.set_attenuation(attenuation)
+
+        # shader light
         self.ambient = ambient
         self.diffuse = diffuse
         self.specular = specular
+        self.set_cut_off(cutOff)
+        self.set_outer_cut_off(outerCutOff)
+        self.set_attenuation(attenuation)
+

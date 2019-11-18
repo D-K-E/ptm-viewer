@@ -194,6 +194,9 @@
                <property name="singleStep">
                 <double>0.010000000000000</double>
                </property>
+               <property name="value">
+                <double>1.000000000000000</double>
+               </property>
               </widget>
              </item>
             </layout>
@@ -228,6 +231,9 @@
                <property name="singleStep">
                 <double>0.010000000000000</double>
                </property>
+               <property name="value">
+                <double>1.000000000000000</double>
+               </property>
               </widget>
              </item>
             </layout>
@@ -261,6 +267,9 @@
                </property>
                <property name="singleStep">
                 <double>0.010000000000000</double>
+               </property>
+               <property name="value">
+                <double>1.000000000000000</double>
                </property>
               </widget>
              </item>
@@ -307,65 +316,50 @@
         </widget>
        </item>
        <item>
-        <layout class="QHBoxLayout" name="horizontalLayout_7" stretch="0,0,0">
+        <layout class="QHBoxLayout" name="horizontalLayout_7" stretch="0,0,0,0">
          <item>
-          <layout class="QVBoxLayout" name="verticalLayout_4" stretch="0,0">
-           <item>
-            <widget class="QLabel" name="label_11">
-             <property name="text">
-              <string>pitch (X)</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QSpinBox" name="rotX">
-             <property name="minimum">
-              <number>-180</number>
-             </property>
-             <property name="maximum">
-              <number>180</number>
-             </property>
-            </widget>
-           </item>
-          </layout>
+          <widget class="QCheckBox" name="rotXCbox">
+           <property name="text">
+            <string>X axis</string>
+           </property>
+          </widget>
          </item>
          <item>
-          <layout class="QVBoxLayout" name="verticalLayout_5" stretch="0,0">
-           <item>
-            <widget class="QLabel" name="label_12">
-             <property name="text">
-              <string>yaw (Y)</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QSpinBox" name="rotY">
-             <property name="minimum">
-              <number>-180</number>
-             </property>
-             <property name="maximum">
-              <number>180</number>
-             </property>
-            </widget>
-           </item>
-          </layout>
+          <widget class="QCheckBox" name="rotYCbox">
+           <property name="text">
+            <string>Y axis</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="rotZCbox">
+           <property name="text">
+            <string>Z axis</string>
+           </property>
+          </widget>
          </item>
          <item>
           <layout class="QVBoxLayout" name="verticalLayout_6" stretch="0,0">
            <item>
-            <widget class="QLabel" name="label_7">
+            <widget class="QLabel" name="angleLbl">
              <property name="text">
-              <string>roll (Z)</string>
+              <string>Angle</string>
              </property>
             </widget>
            </item>
            <item>
-            <widget class="QSpinBox" name="rotZ">
+            <widget class="QDoubleSpinBox" name="angleSpin">
              <property name="minimum">
-              <number>-180</number>
+              <double>-360.000000000000000</double>
              </property>
              <property name="maximum">
-              <number>180</number>
+              <double>360.000000000000000</double>
+             </property>
+             <property name="singleStep">
+              <double>0.010000000000000</double>
+             </property>
+             <property name="value">
+              <double>1.000000000000000</double>
              </property>
             </widget>
            </item>

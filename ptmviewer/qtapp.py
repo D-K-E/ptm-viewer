@@ -6,6 +6,7 @@ from PySide2 import QtCore, QtGui, QtWidgets, QtOpenGL
 
 from PySide2.QtCore import QCoreApplication
 from PySide2.QtWidgets import QOpenGLWidget
+from PySide2.QtGui import QVector3D
 
 from PySide2.shiboken2 import VoidPtr
 
@@ -96,9 +97,6 @@ class AppWindowInit(Ui_MainWindow):
 
 
 class AppWindowGLEvents(AppWindowInit):
-    def __init__(self):
-        super().__init__()
-
     def get_intensity_values(self) -> dict:
         "get intensity values from spin boxes"
         ambient = self.viewerWidget.lamp.ambient.intensity
@@ -171,8 +169,11 @@ class AppWindowGLEvents(AppWindowInit):
         yaw = self.viewerWidget.camera.yaw
         pitch = self.viewerWidget.camera.pitch
         roll = self.viewerWidget.camera.roll
+        viewMat = self.viewerWidget.camera.getViewMatrix()
         angles = {"angles": {"yaw": yaw, "pitch": pitch, "roll": roll}}
         params = {}
+        params["zoom"] = self.viewerWidget.camera.zoom
+        params["view_matrix"] = repr(viewMat)
         params.update(position)
         params.update(front)
         params.update(up)
@@ -180,20 +181,147 @@ class AppWindowGLEvents(AppWindowInit):
         params.update(angles)
         return params
 
+    def get_shader_parameters(self) -> dict:
+        "get shader parameters"
+        params = {}
+        shininess = self.shinSpin.value()
+        lampShader = self.viewerWidget.lampShaderName
+        objectShader = self.viewerWidget.objectShaderName
+        params["light-source-shader"] = shaders[lampShader]
+        params["object-shader"] = shaders[objectShader]
+        params["shininess"] = shininess
+        return params
 
-class AppWindowFinal(AppWindowGLEvents):
+
+class AppWindowLightControlEvents(AppWindowGLEvents):
+    "Light Control events"
+
+    def set_intensity_coefficient(self, val: float, channel: str, isIntensity=False):
+        "set intensity"
+        if self.ambientRBtn.isChecked():
+            if isIntensity:
+                self.viewerWidget.change_lamp_ambient_intensity(
+                    channel=channel, val=val
+                )
+            else:
+                self.viewerWidget.change_lamp_ambient_coefficient(
+                    channel=channel, val=val
+                )
+
+        elif self.diffuseRBtn.isChecked():
+            if isIntensity:
+                self.viewerWidget.change_lamp_diffuse_intensity(
+                    channel=channel, val=val
+                )
+            else:
+                self.viewerWidget.change_lamp_diffuse_coefficient(
+                    channel=channel, val=val
+                )
+
+        elif self.specularRBtn.isChecked():
+            if isIntensity:
+                self.viewerWidget.change_lamp_specular_intensity(
+                    channel=channel, val=val
+                )
+            else:
+                self.viewerWidget.change_lamp_specular_coefficient(
+                    channel=channel, val=val
+                )
+
+        else:
+            return
+
+    def set_red_intensity(self):
+        redval = self.intensityR.value()
+        self.set_intensity_coefficient(val=redval, channel="red", isIntensity=True)
+
+    def set_green_intensity(self):
+        greenval = self.intensityG.value()
+        self.set_intensity_coefficient(val=greenval, channel="green", isIntensity=True)
+
+    def set_blue_intensity(self):
+        blueval = self.intensityB.value()
+        self.set_intensity_coefficient(val=blueval, channel="blue", isIntensity=True)
+
+    def set_red_coefficient(self):
+        redval = self.coefficientR.value()
+        self.set_intensity_coefficient(val=redval, channel="red", isIntensity=False)
+
+    def set_green_coefficient(self):
+        greenval = self.coefficientG.value()
+        self.set_intensity_coefficient(val=greenval, channel="green", isIntensity=False)
+
+    def set_blue_coefficient(self):
+        blueval = self.coefficientB.value()
+        self.set_intensity_coefficient(val=blueval, channel="blue", isIntensity=False)
+
+
+class AppWindowRotateControl(AppWindowLightControlEvents):
+    "Rotate Control"
+
+    def get_axes(self) -> list:
+        zaxis = self.rotZCbox.isChecked()
+        yaxis = self.rotYCbox.isChecked()
+        xaxis = self.rotXCbox.isChecked()
+        rotaxes = []
+        if zaxis:
+            rotaxes.append(QVector3D(0.0, 0.0, 1.0))
+        if yaxis:
+            rotaxes.append(QVector3D(0.0, 1.0, 0.0))
+        if xaxis:
+            rotaxes.append(QVector3D(1.0, 0.0, 0.0))
+        return rotaxes
+
+    def set_angles(self):
+        "Set euler angles either to yaw, pitch and roll"
+        rotation_axes = self.get_axes()
+        angle = self.angleSpin.value()
+        self.viewerWidget.set_rotate_axes(rotation_axes)
+        if self.rotCamRBtn.isChecked():
+            self.viewerWidget.rotate_camera(angle)
+        elif self.rotLightRBtn.isChecked():
+            self.viewerWidget.rotate_lamp(angle)
+
+
+class AppWindowMoveControl(AppWindowRotateControl):
+    "Move window"
+
+    def move_light_camera(self, isUp=False):
+        ""
+        zaxis = self.moveZCBox.isChecked()
+        yaxis = self.moveYCBox.isChecked()
+        xaxis = self.moveXCBox.isChecked()
+        zdir = "+z" if isUp else "-z"
+        ydir = "+y" if isUp else "-y"
+        xdir = "+x" if isUp else "-x"
+        if self.moveLightRBtn.isChecked():
+            if zaxis:
+                self.viewerWidget.move_light(zdir)
+            if yaxis:
+                self.viewerWidget.move_light(ydir)
+            if xaxis:
+                self.viewerWidget.move_light(xdir)
+        elif self.moveCameraRBtn.isChecked():
+            if zaxis:
+                self.viewerWidget.move_camera(zdir)
+            if yaxis:
+                self.viewerWidget.move_camera(ydir)
+            if xaxis:
+                self.viewerWidget.move_camera(xdir)
+
+    def move_up_light_camera(self):
+        self.move_light_camera(isUp=True)
+
+    def move_down_light_camera(self):
+        self.move_light_camera(isUp=False)
+
+
+class AppWindowFinal(AppWindowMoveControl):
     "Final window"
 
     def __init__(self):
         super().__init__()
         self.ptmfiles = {}
-
-        # Button related events
-        self.addFile.clicked.connect(self.browseFolder)
-        self.addFile.setShortcut("ctrl+o")
-
-        self.loadFile.clicked.connect(self.loadPtm)
-        self.loadFile.setShortcut("ctrl+l")
 
         # dock widgets
 
@@ -211,32 +339,34 @@ class AppWindowFinal(AppWindowGLEvents):
         self.moveXCBox.stateChanged.connect(lambda x: x)
         self.moveYCBox.stateChanged.connect(lambda x: x)
         self.moveZCBox.stateChanged.connect(lambda x: x)
-        self.moveUp.clicked.connect(lambda x: x)
-        self.moveDown.clicked.connect(lambda x: x)
+        self.moveUp.clicked.connect(self.move_up_light_camera)
+        self.moveDown.clicked.connect(self.move_down_light_camera)
         ## rotate widget
         ### Available buttons
         self.rotCamRBtn.toggled.connect(lambda x: x)
         self.rotLightRBtn.toggled.connect(lambda x: x)
-        self.rotX.valueChanged.connect(lambda x: x)
-        self.rotY.valueChanged.connect(lambda x: x)
-        self.rotZ.valueChanged.connect(lambda x: x)
+        self.angleSpin.valueChanged.connect(self.set_angles)
         ## color widget
         ### Available buttons
         self.ambientRBtn.toggled.connect(lambda x: x)
         self.diffuseRBtn.toggled.connect(lambda x: x)
         self.specularRBtn.toggled.connect(lambda x: x)
-        self.intensityR.valueChanged.connect(lambda x: x)
-        self.intensityG.valueChanged.connect(lambda x: x)
-        self.intensityB.valueChanged.connect(lambda x: x)
-        self.coefficientR.valueChanged.connect(lambda x: x)
-        self.coefficientG.valueChanged.connect(lambda x: x)
-        self.coefficientB.valueChanged.connect(lambda x: x)
+        self.intensityR.valueChanged.connect(self.set_red_intensity)
+        self.intensityG.valueChanged.connect(self.set_green_intensity)
+        self.intensityB.valueChanged.connect(self.set_blue_intensity)
+        self.coefficientR.valueChanged.connect(self.set_red_coefficient)
+        self.coefficientG.valueChanged.connect(self.set_green_coefficient)
+        self.coefficientB.valueChanged.connect(self.set_blue_coefficient)
 
         ## file list widget
         ### Available buttons
-        self.addFile.clicked.connect(lambda x: x)
-        self.loadFile.clicked.connect(lambda x: x)
-        self.removeFile.clicked.connect(lambda x: x)
+        self.addFile.clicked.connect(self.browseFolder)
+        self.addFile.setShortcut("ctrl+o")
+
+        self.loadFile.clicked.connect(self.loadPtm)
+        self.loadFile.setShortcut("ctrl+l")
+
+        self.removeFile.clicked.connect(self.removeItems)
         ## shader widget
         self.shinSpin.valueChanged.connect(lambda x: x)
 
@@ -244,10 +374,10 @@ class AppWindowFinal(AppWindowGLEvents):
         self.availableGlWidgets = {
             "Lambertian": PtmLambertianGLWidget,
             "SingleNormalMap": PtmNormalMapGLWidget,
-            "PerChannelPhong": PtmPerChannelNormalMapPhongGLWidget,
+            # "PerChannelPhong": PtmPerChannelNormalMapPhongGLWidget,
             "PerChannelNormalMapDir": PtmPerChannelNormalMapDirGLWidget,
-            "PerChannelNormalMapPoint": PtmPerChannelNormalMapPointGLWidget,
-            "PerChannelNormalMapSpot": PtmPerChannelNormalMapSpotGLWidget,
+            # "PerChannelNormalMapPoint": PtmPerChannelNormalMapPointGLWidget,
+            # "PerChannelNormalMapSpot": PtmPerChannelNormalMapSpotGLWidget,
         }
         wnames = [k for k in self.availableGlWidgets.keys()]
         self.shaderCombo.addItems(wnames)
@@ -340,51 +470,12 @@ class AppWindowFinal(AppWindowGLEvents):
 
     def getParams(self) -> dict:
         "Get parameters from widgets"
-        red = self.intensityR.value()
-        green = self.intensityG.value()
-        blue = self.intensityB.value()
-        red_coeff = self.coefficientR.value()
-        green_coeff = self.coefficientG.value()
-        blue_coeff = self.coefficientB.value()
-        shininess = self.shinSpin.value()
-        light_position = self.viewerWidget.lamp.position
-        light_attenuation = self.viewerWidget.lamp.attenuation
-        light_cutoff = self.viewerWidget.lamp.cutOff
-        camera_position = self.viewerWidget.camera.position
-        camera_matrix = self.viewerWidget.camera.getViewMatrix()
-        projectionMatrix = QtGui.QMatrix4x4()
-        projectionMatrix.perspective(
-            self.viewerWidget.camera.zoom,
-            self.viewerWidget.width() / self.viewerWidget.height(),
-            0.2,
-            100.0,
-        )
-        model = QtGui.QMatrix4x4()
+        light_params = self.get_lamp_parameters()
+        camera_params = self.get_camera_parameters()
         parameters = {}
-        vals = projectionMatrix.copyDataTo()
-        parameters["projection_matrix"] = vals
-        vals = camera_matrix.copyDataTo()
-        parameters["camera_view_matrix"] = vals
-        parameters["camera_position"] = dict(
-            x=camera_position.x(), y=camera_position.y(), z=camera_position.z()
-        )
-        parameters["light_position"] = dict(
-            x=light_position.x(), y=light_position.y(), z=light_position.z()
-        )
-        parameters["light_direction"] = dict(
-            x=light_direction.x(), y=light_direction.y(), z=light_direction.z()
-        )
-        parameters["light_attenuation"] = dict(
-            x=light_attenuation.x(), y=light_attenuation.y(), z=light_attenuation.z()
-        )
-        parameters["light_cutoff"] = str(light_cutoff)
-        parameters["ambient_coefficient"] = str(ambient_coeff)
-        parameters["intensities"] = {
-            "red_channel_light_intensity": str(red),
-            "green_channel_light_intensity": str(green),
-            "blue_channel_light_intensity": str(blue),
-        }
-        parameters["lamp_rotation_angle"] = str(rotation_angle)
+        parameters["light"] = self.get_lamp_parameters()
+        parameters["camera"] = self.get_camera_parameters()
+        parameters["shader"] = self.get_shader_parameters()
         return parameters
 
     def updateParamBrowser(self):
@@ -396,10 +487,6 @@ class AppWindowFinal(AppWindowGLEvents):
         params = self.getParams()
         params["image-format"] = "PNG"
         params["image-encoding"] = "hex"
-        lampShader = self.viewerWidget.lampShaderName
-        objectShader = self.viewerWidget.objectShaderName
-        params["light-source-shader"] = shaders[lampShader]
-        params["object-shader"] = shaders[objectShader]
         screen = self.viewerWidget.grabFramebuffer()
         barr = QtCore.QByteArray()
         qbfr = QtCore.QBuffer(barr)
@@ -424,6 +511,10 @@ class AppWindowFinal(AppWindowGLEvents):
         if fpath:
             with open(fpath, "w", encoding="utf-8", newline="\n") as fd:
                 fd.write(text)
+
+    def set_shininess(self):
+        shininess = self.shinSpin.value()
+        self.viewerWidget.change_shininess(val=shininess)
 
     ### Standard Gui Elements ###
 
@@ -451,6 +542,17 @@ class AppWindowFinal(AppWindowGLEvents):
                 ptmobj["index"] = self.fileList.indexFromItem(ptmitem)
                 self.ptmfiles[ptmobj["index"]] = ptmobj
                 self.fileList.sortItems()
+
+    def removeItems(self):
+        "remove items from list"
+        items = self.fileList.selectedItems()
+        if not items:
+            return
+        for item in items:
+            index = self.fileList.indexFromItem(item)
+            itemRow = self.fileList.row(item)
+            self.ptmfiles.pop(index)
+            self.fileList.takeItem(itemRow)
 
     def closeApp(self, event):
         "Close application"

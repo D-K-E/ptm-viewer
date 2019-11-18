@@ -302,35 +302,35 @@ class QtRigid3dObject(AbstractRigid3dObject):
     def x_axis_rotation_matrix(self):
         "overriding base class property"
         return QMatrix4x4(
-            [
-                QVector4D(1, 0, 0, 0),
-                QVector4D(0, math.cos(self.roll), -math.sin(self.roll), 0),
-                QVector4D(0, math.sin(self.roll), math.cos(self.roll), 0),
-                QVector4D(0, 0, 0, 1),
-            ]
+            # fmt: off
+                1.0, 0.0, 0.0, 0.0,
+                0.0, math.cos(self.roll), -math.sin(self.roll), 0.0,
+                0.0, math.sin(self.roll), math.cos(self.roll), 0.0,
+                0.0, 0.0, 0.0, 1.0,
+            # fmt: on
         )
 
     @property
     def y_axis_rotation_matrix(self):
         "rotation matrix over y axis"
         return QMatrix4x4(
-            [
-                QVector4D(math.cos(self.pitch), 0, math.sin(self.pitch), 0),
-                QVector4D(0, 1, 0, 0),
-                QVector4D(-math.sin(self.pitch), 0, math.cos(self.pitch), 0),
-                QVector4D(0, 0, 0, 1),
-            ]
+            # fmt: off
+                math.cos(self.pitch), 0.0, math.sin(self.pitch), 0.0,
+                0.0, 1.0, 0.0, 0.0,
+                -math.sin(self.pitch), 0.0, math.cos(self.pitch), 0.0,
+                0.0, 0.0, 0.0, 1.0,
+            # fmt: on
         )
 
     @property
     def z_axis_rotation_matrix(self):
         return QMatrix4x4(
-            [
-                QVector4D(math.cos(self.yaw), -math.sin(self.yaw), 0, 0),
-                QVector4D(math.sin(self.yaw), math.cos(self.yaw), 0, 0),
-                QVector4D(0, 0, 1, 0),
-                QVector4D(0, 0, 0, 1),
-            ]
+            # fmt: off
+                math.cos(self.yaw), -math.sin(self.yaw), 0.0, 0.0,
+                math.sin(self.yaw), math.cos(self.yaw), 0.0, 0.0,
+                0.0, 0.0, 1.0, 0.0,
+                0.0, 0.0, 0.0, 1.0,
+            # fmt: on
         )
 
     @property
