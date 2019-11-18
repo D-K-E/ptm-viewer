@@ -4,6 +4,8 @@ A module for objects expressed 3d world
 
 import math
 from ptmviewer.utils.utils import mat2matDot
+from ptmviewer.utils.utils import mat2vecDot
+from ptmviewer.utils.utils import set_column_mat
 from ptmviewer.utils.utils import normalize_tuple
 from ptmviewer.utils.utils import vec2vecAdd
 from ptmviewer.utils.utils import vec2vecSubs
@@ -28,6 +30,9 @@ class AbstractRigid3dObject(ABC):
         # up with respect to center of the world
         self.up = None  # with respect to the objects current position
         self.right = None  # with respect to the objects current position
+        # identity matrix for movement and rotation
+        self.idmat = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
+        self.modelmat = [[], [], [], []]
 
         # Euler angles for rotation
         self.yaw = -90.0  # rotation over z axis
@@ -69,6 +74,10 @@ class AbstractRigid3dObject(ABC):
 
     @abstractmethod
     def set_position(self, pos):
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_model_matrix(self):
         raise NotImplementedError
 
     @abstractmethod
@@ -166,6 +175,22 @@ class PureRigid3dObject(AbstractRigid3dObject):
             mat1=self.y_axis_rotation_matrix, mat2=self.x_axis_rotation_matrix
         )
         return mat2matDot(mat1=self.z_axis_rotation_matrix, mat2=mat2)
+
+    def rotate(self):
+        "rotate object using rotation matrix"
+        rotmat = self.rotation_matrix
+        pos = self.position["x"], self.position["y"], self.position["z"]
+        pos = list(pos)
+        newpos = mat2vecDot(rotmat, pos)
+        self.set_position({"x": newpos[0], "y": newpos[1], "z": newpos[2]})
+
+    def get_model_matrix(self) -> list:
+        "get model matrix"
+        homcoord = self.position["x"], self.position["y"], self.position["z"], 1
+        homocoord = list(homcoord)
+        idmat = self.idmat.copy()
+        idmat = set_column_mat(-1, homocoord, idmat)
+        return idmat
 
     def update_vectors(self):
         "update front, up, right vectors"
@@ -296,6 +321,8 @@ class QtRigid3dObject(AbstractRigid3dObject):
         self.worldUp = QVector3D(0.0, 1.0, 0.0)
         self.up = None
         self.right = None
+        self.idmat = QMatrix4x4()
+        self.idmat.setToIdentity()
 
     # overriding property
     @property
@@ -338,6 +365,15 @@ class QtRigid3dObject(AbstractRigid3dObject):
         "rotation matrix"
         mat2 = self.y_axis_rotation_matrix * self.x_axis_rotation_matrix
         return self.z_axis_rotation_matrix * mat2
+
+    def rotate(self):
+        newpos = self.rotation_matrix * self.position
+        self.set_position(newpos)
+
+    def get_model_matrix(self):
+        newmat = QMatrix4x4(self.idmat)
+        newmat.translate(self.position)
+        return newmat
 
     def update_vectors(self):
         "override base class"

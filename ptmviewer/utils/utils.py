@@ -158,10 +158,19 @@ def vec2vecDot(vec1, vec2):
     return tuple(sum(v1 * v2 for v1, v2 in zip(vec1, vec2)))
 
 
-def sliceCol(colInd: int, matrix):
+def sliceCol(colInd: int, matrix: list):
     "slice column values from matrix"
     rownb = len(matrix)
     return [matrix[i, colInd] for i in range(rownb)]
+
+
+def set_column_mat(pos: int, arr: list, mat: list) -> list:
+    "set column to matrix at given position"
+    if len(mat) != len(arr):
+        raise ValueError("Col height not equal to size of array to insert")
+    for index, row in enumerate(mat):
+        row[pos] = arr[index]
+    return mat
 
 
 def mat2matDot(mat1: list, mat2: list) -> list:
@@ -178,6 +187,17 @@ def mat2matDot(mat1: list, mat2: list) -> list:
             newmatRow.append(vec2vecDot(mat1Row, mat2col))
         mat.append(newmatRow)
     return mat
+
+
+def mat2vecDot(mat: list, vec: list) -> list:
+    "dot product in pure python matrix to vector"
+    if len(mat[0]) != len(vec):
+        raise ValueError("Matrix vector shape should be same with vector shape")
+    newmat = [[0 for i in range(len(mat[0]))] for k in range(len(mat))]
+    for i, row in enumerate(mat):
+        newrow = vec2vecDot(row, vec)
+        newmat = set_column_mat(pos=i, arr=newrow, mat=newmat)
+    return newmat
 
 
 def scalar2vecMult(vec, scalar):
