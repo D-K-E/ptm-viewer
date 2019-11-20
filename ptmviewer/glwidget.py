@@ -129,8 +129,8 @@ class AbstractGLWidgetHelper(QOpenGLWidget):
         self.attrLoc[shaderName]["stride"] = stride
 
 
-class AbstractPointLightPtmGLWidget(AbstractGLWidgetHelper):
-    "OpenGL widget"
+class UiGLEvents(AbstractGLWidgetHelper):
+    "Deal with user interface events"
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
@@ -144,7 +144,141 @@ class AbstractPointLightPtmGLWidget(AbstractGLWidgetHelper):
         # light source: point light
         self.lamp = QtShaderLight()
         self.shininess = 30.0
+        # dealing with rotation and axes
+        self.rotationAngle = 45.0
+        self.cameraRotationAngle = 45.0
+        self.rotationAxes = ["x"]
 
+    def set_rotate_axes(self, axes: List[QVector3D]):
+        self.rotationAxes = axes
+
+    # lamp methods
+    def move_light(self, direction: str):
+        "Translate light position vector to a new position"
+        self.lamp.move(direction, deltaTime=0.05)
+        pos = self.lamp.position
+        newpos = self.limit_movement(pos)
+        self.lamp.set_position(newpos)
+        self.update()
+
+    def set_euler_angle_to_lamp(self, angle: float):
+        "set euler angles to lamp with available axes"
+        for axis in self.rotationAxes:
+            if axis == "x":
+                self.lamp.set_roll(angle)
+            elif axis == "y":
+                self.lamp.set_pitch(angle)
+            elif axis == "z":
+                self.lamp.set_yaw(angle)
+        self.update()
+
+    def change_lamp_diffuse_intensity(self, channel: str, val: float):
+        ""
+        availables = ["red", "green", "blue"]
+        if channel not in availables:
+            mess = "Unknown channel name " + channel
+            mess += ", available channels are: "
+            mess += "red, green, blue"
+            raise ValueError(mess)
+        self.lamp.set_channel_intensity(channel=channel, val=val, lsource="diffuse")
+        self.update()
+
+    def change_lamp_specular_intensity(self, channel: str, val: float):
+        ""
+        availables = ["red", "green", "blue"]
+        if channel not in availables:
+            mess = "Unknown channel name " + channel
+            mess += ", available channels are: "
+            mess += "red, green, blue"
+            raise ValueError(mess)
+        self.lamp.set_channel_intensity(channel=channel, val=val, lsource="specular")
+        self.update()
+
+    def change_lamp_ambient_intensity(self, channel: str, val: float):
+        ""
+        availables = ["red", "green", "blue"]
+        if channel not in availables:
+            mess = "Unknown channel name " + channel
+            mess += ", available channels are: "
+            mess += "red, green, blue"
+            raise ValueError(mess)
+        self.lamp.set_channel_intensity(channel=channel, val=val, lsource="ambient")
+        self.update()
+
+    def change_lamp_diffuse_coefficient(self, channel: str, val: float):
+        "lamp diffuse coefficient"
+        availables = ["red", "green", "blue"]
+        if channel not in availables:
+            mess = "Unknown channel name " + channel
+            mess += ", available channels are: "
+            mess += "red, green, blue"
+            raise ValueError(mess)
+        self.lamp.set_channel_coeff(channel=channel, val=val, lsource="diffuse")
+        self.update()
+
+    def change_lamp_specular_coefficient(self, channel: str, val: float):
+        "lamp diffuse coefficient"
+        availables = ["red", "green", "blue"]
+        if channel not in availables:
+            mess = "Unknown channel name " + channel
+            mess += ", available channels are: "
+            mess += "red, green, blue"
+            raise ValueError(mess)
+        self.lamp.set_channel_coeff(channel=channel, val=val, lsource="specular")
+        self.update()
+
+    def change_lamp_ambient_coefficient(self, channel: str, val: float):
+        "lamp diffuse coefficient"
+        availables = ["red", "green", "blue"]
+        if channel not in availables:
+            mess = "Unknown channel name " + channel
+            mess += ", available channels are: "
+            mess += "red, green, blue"
+            raise ValueError(mess)
+        self.lamp.set_channel_coeff(channel=channel, val=val, lsource="ambient")
+        self.update()
+
+    # camera methods
+    def move_camera(self, direction: str):
+        "Move camera to certain direction and update gl widget"
+        self.camera.move(direction, deltaTime=0.05)
+        pos = self.camera.position
+        pos = self.limit_movement(pos)
+        self.camera.set_position(pos)
+        self.update()
+
+    def rotate_camera_model(self, model: QMatrix4x4):
+        "rotate camera model"
+        for axis in self.rotationAxes:
+            model.rotate(self.cameraRotationAngle, axis)
+        return model
+
+    def rotate_camera(self, angle: float):
+        self.cameraRotationAngle = angle
+        self.update()
+
+    def set_euler_angles_to_camera(self, angle: float):
+        "set euler angles to camera"
+        for axis in self.rotationAxes:
+            if axis == "x":
+                self.camera.set_roll(angle)
+            elif axis == "y":
+                self.camera.set_pitch(angle)
+            elif axis == "z":
+                self.camera.set_yaw(angle)
+        self.update()
+
+    def turn_camera_around(self, x: float, y: float):
+        ""
+        self.camera.lookAround(xoffset=x, yoffset=y, pitchBound=True)
+        self.update()
+
+
+class AbstractPointLightPtmGLWidget(UiGLEvents):
+    "OpenGL widget"
+
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
         # shaders
         self.shaders = shaders
         self.rowsize = 0
@@ -288,9 +422,6 @@ class AbstractPointLightPtmGLWidget(AbstractGLWidgetHelper):
             dtype=ctypes.c_float,
         )
         # fmt: on
-        self.rotationAngle = 45.0
-        self.cameraRotationAngle = 45.0
-        self.rotationAxes = [QVector3D(1.0, 0.0, 0.0)]
         #
         self.worldLimitTop = 3.0  # + imTopY
         self.worldLimitBottom = -3.0  # + imBottomY
@@ -317,133 +448,6 @@ class AbstractPointLightPtmGLWidget(AbstractGLWidgetHelper):
         elif pz < self.worldLimitDepthNeg:
             pos.setZ(self.worldLimitDepthNeg)
         return pos
-
-    def set_rotate_axes(self, axes: List[QVector3D]):
-        self.rotationAxes = axes
-
-    # lamp methods
-    def move_light(self, direction: str):
-        "Translate light position vector to a new position"
-        self.lamp.move(direction, deltaTime=0.05)
-        pos = self.lamp.position
-        newpos = self.limit_movement(pos)
-        self.lamp.set_position(newpos)
-        self.update()
-
-    def set_euler_angles_to_lamp(self, yaw: float, pitch: float, roll: float):
-        ""
-        self.lamp.set_yaw(yaw)
-        self.lamp.set_pitch(pitch)
-        self.lamp.set_roll(roll)
-        self.update()
-
-    def change_lamp_diffuse_intensity(self, channel: str, val: float):
-        ""
-        availables = ["red", "green", "blue"]
-        if channel not in availables:
-            mess = "Unknown channel name " + channel
-            mess += ", available channels are: "
-            mess += "red, green, blue"
-            raise ValueError(mess)
-        self.lamp.set_channel_intensity(channel=channel, val=val, lsource="diffuse")
-        self.update()
-
-    def change_lamp_specular_intensity(self, channel: str, val: float):
-        ""
-        availables = ["red", "green", "blue"]
-        if channel not in availables:
-            mess = "Unknown channel name " + channel
-            mess += ", available channels are: "
-            mess += "red, green, blue"
-            raise ValueError(mess)
-        self.lamp.set_channel_intensity(channel=channel, val=val, lsource="specular")
-        self.update()
-
-    def change_lamp_ambient_intensity(self, channel: str, val: float):
-        ""
-        availables = ["red", "green", "blue"]
-        if channel not in availables:
-            mess = "Unknown channel name " + channel
-            mess += ", available channels are: "
-            mess += "red, green, blue"
-            raise ValueError(mess)
-        self.lamp.set_channel_intensity(channel=channel, val=val, lsource="ambient")
-        self.update()
-
-    def change_lamp_diffuse_coefficient(self, channel: str, val: float):
-        "lamp diffuse coefficient"
-        availables = ["red", "green", "blue"]
-        if channel not in availables:
-            mess = "Unknown channel name " + channel
-            mess += ", available channels are: "
-            mess += "red, green, blue"
-            raise ValueError(mess)
-        self.lamp.set_channel_coeff(channel=channel, val=val, lsource="diffuse")
-        self.update()
-
-    def change_lamp_specular_coefficient(self, channel: str, val: float):
-        "lamp diffuse coefficient"
-        availables = ["red", "green", "blue"]
-        if channel not in availables:
-            mess = "Unknown channel name " + channel
-            mess += ", available channels are: "
-            mess += "red, green, blue"
-            raise ValueError(mess)
-        self.lamp.set_channel_coeff(channel=channel, val=val, lsource="specular")
-        self.update()
-
-    def change_lamp_ambient_coefficient(self, channel: str, val: float):
-        "lamp diffuse coefficient"
-        availables = ["red", "green", "blue"]
-        if channel not in availables:
-            mess = "Unknown channel name " + channel
-            mess += ", available channels are: "
-            mess += "red, green, blue"
-            raise ValueError(mess)
-        self.lamp.set_channel_coeff(channel=channel, val=val, lsource="ambient")
-        self.update()
-
-    def rotate_lamp(self, angle: float):
-        "rotate lamp using given angle"
-        self.rotationAngle = angle
-        self.update()
-
-    def rotate_lamp_model(self, model: QMatrix4x4):
-        "rotate model with given matrices"
-        for axis in self.rotationAxes:
-            model.rotate(self.rotationAngle, axis)
-        return model
-
-    # camera methods
-    def move_camera(self, direction: str):
-        "Move camera to certain direction and update gl widget"
-        self.camera.move(direction, deltaTime=0.05)
-        pos = self.camera.position
-        pos = self.limit_movement(pos)
-        self.camera.set_position(pos)
-        self.update()
-
-    def rotate_camera_model(self, model: QMatrix4x4):
-        "rotate camera model"
-        for axis in self.rotationAxes:
-            model.rotate(self.cameraRotationAngle, axis)
-        return model
-
-    def rotate_camera(self, angle: float):
-        self.cameraRotationAngle = angle
-        self.update()
-
-    def set_euler_angles_to_camera(self, yaw: float, pitch: float, roll: float):
-        "set euler angles to camera"
-        self.camera.set_yaw(yaw)
-        self.camera.set_pitch(pitch)
-        self.camera.set_roll(roll)
-        self.update()
-
-    def turn_camera_around(self, x: float, y: float):
-        ""
-        self.camera.lookAround(xoffset=x, yoffset=y, pitchBound=True)
-        self.update()
 
     def change_shininess(self, val: float):
         "set a new shininess value to cube fragment shader"
@@ -497,19 +501,19 @@ class AbstractPointLightPtmGLWidget(AbstractGLWidgetHelper):
 
     def programShader_init_uniforms(self):
         "set uniforms during initilization"
-        pass
+        raise NotImplementedError
 
     def lampShader_init_uniforms(self):
         "set uniforms during initilization of lamp shader"
-        pass
+        raise NotImplementedError
 
     def setLampShaderUniforms_proc(self):
         "Set lamp shader uniforms"
-        pass
+        raise NotImplementedError
 
     def setObjectShaderUniforms_proc(self):
         ""
-        pass
+        raise NotImplementedError
 
     def bindTextures_proc(self):
         "bind textures to paint event"
@@ -714,9 +718,7 @@ class PtmLambertianGLWidget(AbstractPointLightPtmGLWidget):
             self.camera.zoom, self.width() / self.height(), 0.2, 100.0
         )
         viewMatrix = self.camera.getViewMatrix()
-        lampModel = QMatrix4x4()
-        lampModel.translate(self.lamp.position)
-        lampModel = self.rotate_lamp_model(lampModel)
+        lampModel = self.lamp.get_model_matrix()
         # pdb.set_trace()
         self.lampProgram.setUniformValue("projection", projectionMatrix)
         self.lampProgram.setUniformValue("view", viewMatrix)
@@ -1257,9 +1259,7 @@ class PtmCoefficientShader(AbstractPointLightPtmGLWidget):
             self.camera.zoom, self.width() / self.height(), 0.2, 100.0
         )
         viewMatrix = self.camera.getViewMatrix()
-        lampModel = QMatrix4x4()
-        lampModel.translate(self.lamp.position)
-        lampModel = self.rotate_lamp_model(lampModel)
+        lampModel = self.lamp.get_model_matrix()
         self.lampProgram.setUniformValue("projection", projectionMatrix)
         self.lampProgram.setUniformValue("view", viewMatrix)
         self.lampProgram.setUniformValue("model", lampModel)

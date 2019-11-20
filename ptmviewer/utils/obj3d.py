@@ -44,24 +44,60 @@ class AbstractRigid3dObject(ABC):
         self.movementSpeed = 2.5
         self.availableMoves = ["+z", "-z", "+x", "-x", "+y", "-y"]
 
-    @property
+    @classmethod
     @abstractmethod
+    def make_rotation_matrix(cls, axis: str, angle: float):
+        raise NotImplementedError
+
+    @property
     def z_axis_rotation_matrix(self):
-        raise NotImplementedError
+        "rotation matrix over z axis"
+        return self.make_rotation_matrix(axis="z", angle=self.yaw)
 
     @property
-    @abstractmethod
     def y_axis_rotation_matrix(self):
-        raise NotImplementedError
+        "rotation matrix over y axis"
+        return self.make_rotation_matrix(axis="y", angle=self.pitch)
 
     @property
-    @abstractmethod
     def x_axis_rotation_matrix(self):
-        raise NotImplementedError
+        "rotation matrix over x axis"
+        return self.make_rotation_matrix(axis="x", angle=self.roll)
 
     @property
     @abstractmethod
     def rotation_matrix(self):
+        raise NotImplementedError
+
+    @abstractmethod
+    def compute_rotation(self, rotmat):
+        raise NotImplementedError
+
+    def rotate(self):
+        "rotate object using rotation matrix"
+        newpos = self.rotated_position()
+        self.set_position(newpos)
+
+    def rotated_position(self):
+        return self.compute_rotation(self.rotation_matrix)
+
+    def rotate_around(self, axis: str, angle: float):
+        "rotate around given axis"
+        ax = axis.lower()
+        if ax == "x":
+            rotation_matrix = self.make_rotation_matrix(axis="x", angle=angle)
+        elif ax == "y":
+            rotation_matrix = self.make_rotation_matrix(axis="y", angle=angle)
+        elif ax == "z":
+            rotation_matrix = self.make_rotation_matrix(axis="z", angle=angle)
+        else:
+            raise ValueError("unknown axis: " + axis + ". x, y, z are allowed.")
+        newpos = self.compute_rotation(rotation_matrix)
+        self.set_position(newpos)
+
+    @abstractmethod
+    def get_model_matrix(self):
+        "get model matrix for object matrix 4x4"
         raise NotImplementedError
 
     @abstractmethod
@@ -74,10 +110,6 @@ class AbstractRigid3dObject(ABC):
 
     @abstractmethod
     def set_position(self, pos):
-        raise NotImplementedError
-
-    @abstractmethod
-    def get_model_matrix(self):
         raise NotImplementedError
 
     @abstractmethod
@@ -112,6 +144,11 @@ class AbstractRigid3dObject(ABC):
         self.check_angle(angle=val, angle_name="roll")
         self.update_vectors()
 
+    def __str__(self):
+        mess = "3d object at {0}, with yaw {1}, pitch {2}, "
+        mess += "and roll {3}"
+        return mess.format(self.position, self.yaw, self.pitch, self.roll)
+
 
 class PureRigid3dObject(AbstractRigid3dObject):
     "Basic rigid body in 3d world"
@@ -138,35 +175,33 @@ class PureRigid3dObject(AbstractRigid3dObject):
         self.movementSpeed = 2.5
         self.availableMoves = ["+z", "-z", "+x", "-x", "+y", "-y"]
 
-    @property
-    def z_axis_rotation_matrix(self):
-        "rotation matrix over z axis"
-        return [
-            [math.cos(self.yaw), -math.sin(self.yaw), 0, 0],
-            [math.sin(self.yaw), math.cos(self.yaw), 0, 0],
-            [0, 0, 1, 0],
-            [0, 0, 0, 1],
-        ]
-
-    @property
-    def y_axis_rotation_matrix(self):
-        "rotation matrix over y axis"
-        return [
-            [math.cos(self.pitch), 0, math.sin(self.pitch), 0],
-            [0, 1, 0, 0],
-            [-math.sin(self.pitch), 0, math.cos(self.pitch), 0],
-            [0, 0, 0, 1],
-        ]
-
-    @property
-    def x_axis_rotation_matrix(self):
-        "rotation matrix over x axis"
-        return [
-            [1, 0, 0, 0],
-            [0, math.cos(self.roll), -math.sin(self.roll), 0],
-            [0, math.sin(self.roll), math.cos(self.roll), 0],
-            [0, 0, 0, 1],
-        ]
+    @classmethod
+    def make_rotation_matrix(cls, axis: str, angle: float):
+        "make a rotation matrix using angle and axis"
+        ax = axis.lower()
+        if ax == "x":
+            return [
+                [1, 0, 0, 0],
+                [0, math.cos(angle), -math.sin(angle), 0],
+                [0, math.sin(angle), math.cos(angle), 0],
+                [0, 0, 0, 1],
+            ]
+        elif ax == "y":
+            return [
+                [math.cos(angle), 0, math.sin(angle), 0],
+                [0, 1, 0, 0],
+                [-math.sin(angle), 0, math.cos(angle), 0],
+                [0, 0, 0, 1],
+            ]
+        elif ax == "z":
+            return [
+                [math.cos(angle), -math.sin(angle), 0, 0],
+                [math.sin(angle), math.cos(angle), 0, 0],
+                [0, 0, 1, 0],
+                [0, 0, 0, 1],
+            ]
+        else:
+            raise ValueError("Unknown axis: " + axis + ". x, y, z available")
 
     @property
     def rotation_matrix(self):
@@ -176,19 +211,18 @@ class PureRigid3dObject(AbstractRigid3dObject):
         )
         return mat2matDot(mat1=self.z_axis_rotation_matrix, mat2=mat2)
 
-    def rotate(self):
-        "rotate object using rotation matrix"
-        rotmat = self.rotation_matrix
-        pos = self.position["x"], self.position["y"], self.position["z"]
-        pos = list(pos)
+    def compute_rotation(self, rotmat: List[List[float]]):
+        "compute rotation for current coordinates"
+        ps = self.position["x"], self.position["y"], self.position["z"]
+        pos = list(ps)
         newpos = mat2vecDot(rotmat, pos)
-        self.set_position({"x": newpos[0], "y": newpos[1], "z": newpos[2]})
+        return {"x": newpos[0], "y": newpos[1], "z": newpos[2]}
 
     def get_model_matrix(self) -> list:
         "get model matrix"
         homcoord = self.position["x"], self.position["y"], self.position["z"], 1
         homocoord = list(homcoord)
-        idmat = self.idmat.copy()
+        idmat = self.rotation_matrix.copy()
         idmat = set_column_mat(-1, homocoord, idmat)
         return idmat
 
@@ -325,40 +359,21 @@ class QtRigid3dObject(AbstractRigid3dObject):
         self.idmat.setToIdentity()
 
     # overriding property
-    @property
-    def x_axis_rotation_matrix(self):
-        "overriding base class property"
-        return QMatrix4x4(
-            # fmt: off
-                1.0, 0.0, 0.0, 0.0,
-                0.0, math.cos(self.roll), -math.sin(self.roll), 0.0,
-                0.0, math.sin(self.roll), math.cos(self.roll), 0.0,
-                0.0, 0.0, 0.0, 1.0,
-            # fmt: on
-        )
-
-    @property
-    def y_axis_rotation_matrix(self):
-        "rotation matrix over y axis"
-        return QMatrix4x4(
-            # fmt: off
-                math.cos(self.pitch), 0.0, math.sin(self.pitch), 0.0,
-                0.0, 1.0, 0.0, 0.0,
-                -math.sin(self.pitch), 0.0, math.cos(self.pitch), 0.0,
-                0.0, 0.0, 0.0, 1.0,
-            # fmt: on
-        )
-
-    @property
-    def z_axis_rotation_matrix(self):
-        return QMatrix4x4(
-            # fmt: off
-                math.cos(self.yaw), -math.sin(self.yaw), 0.0, 0.0,
-                math.sin(self.yaw), math.cos(self.yaw), 0.0, 0.0,
-                0.0, 0.0, 1.0, 0.0,
-                0.0, 0.0, 0.0, 1.0,
-            # fmt: on
-        )
+    @classmethod
+    def make_rotation_matrix(cls, axis: str, angle: float):
+        "make rotation matrix with given axis"
+        ax = axis.lower()
+        mat = QMatrix4x4()
+        mat.setToIdentity()
+        if ax == "x":
+            mat.rotate(angle, QVector3D(1.0, 0.0, 0.0))
+        elif ax == "y":
+            mat.rotate(angle, QVector3D(0.0, 1.0, 0.0))
+        elif ax == "z":
+            mat.rotate(angle, QVector3D(0.0, 0.0, 1.0))
+        else:
+            raise ValueError("Unknown axis: " + axis + ". x, y, z available")
+        return mat
 
     @property
     def rotation_matrix(self):
@@ -366,14 +381,14 @@ class QtRigid3dObject(AbstractRigid3dObject):
         mat2 = self.y_axis_rotation_matrix * self.x_axis_rotation_matrix
         return self.z_axis_rotation_matrix * mat2
 
-    def rotate(self):
-        newpos = self.rotation_matrix * self.position
-        self.set_position(newpos)
+    def compute_rotation(self, rotmat: QMatrix4x4):
+        "compute rotation"
+        return rotmat * self.position
 
     def get_model_matrix(self):
-        newmat = QMatrix4x4(self.idmat)
-        newmat.translate(self.position)
-        return newmat
+        modelmat = QMatrix4x4(self.rotation_matrix)
+        modelmat.translate(self.position)
+        return modelmat
 
     def update_vectors(self):
         "override base class"
