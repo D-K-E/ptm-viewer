@@ -501,19 +501,19 @@ class AbstractPointLightPtmGLWidget(UiGLEvents):
 
     def programShader_init_uniforms(self):
         "set uniforms during initilization"
-        raise NotImplementedError
+        pass
 
     def lampShader_init_uniforms(self):
         "set uniforms during initilization of lamp shader"
-        raise NotImplementedError
+        pass
 
     def setLampShaderUniforms_proc(self):
         "Set lamp shader uniforms"
-        raise NotImplementedError
+        pass
 
     def setObjectShaderUniforms_proc(self):
         ""
-        raise NotImplementedError
+        pass
 
     def bindTextures_proc(self):
         "bind textures to paint event"

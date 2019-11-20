@@ -265,11 +265,11 @@ class AppWindowRotateControl(AppWindowLightControlEvents):
         xaxis = self.rotXCbox.isChecked()
         rotaxes = []
         if zaxis:
-            rotaxes.append(QVector3D(0.0, 0.0, 1.0))
+            rotaxes.append("z")
         if yaxis:
-            rotaxes.append(QVector3D(0.0, 1.0, 0.0))
+            rotaxes.append("y")
         if xaxis:
-            rotaxes.append(QVector3D(1.0, 0.0, 0.0))
+            rotaxes.append("x")
         return rotaxes
 
     def set_angles(self):
@@ -278,9 +278,9 @@ class AppWindowRotateControl(AppWindowLightControlEvents):
         angle = self.angleSpin.value()
         self.viewerWidget.set_rotate_axes(rotation_axes)
         if self.rotCamRBtn.isChecked():
-            self.viewerWidget.rotate_camera(angle)
+            self.viewerWidget.set_euler_angles_to_camera(angle)
         elif self.rotLightRBtn.isChecked():
-            self.viewerWidget.rotate_lamp(angle)
+            self.viewerWidget.set_euler_angle_to_lamp(angle)
 
 
 class AppWindowMoveControl(AppWindowRotateControl):

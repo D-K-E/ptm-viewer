@@ -386,7 +386,8 @@ class QtRigid3dObject(AbstractRigid3dObject):
         return rotmat * self.position
 
     def get_model_matrix(self):
-        modelmat = QMatrix4x4(self.rotation_matrix)
+        vals = self.rotation_matrix.copyDataTo()
+        modelmat = QMatrix4x4(vals)
         modelmat.translate(self.position)
         return modelmat
 
