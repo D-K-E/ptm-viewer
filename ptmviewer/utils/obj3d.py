@@ -136,13 +136,13 @@ class AbstractRigid3dObject(ABC):
         self.update_vectors()
 
     def set_pitch(self, val: float):
-        "Set yaw value"
+        "Set pitch value"
         self.check_angle(angle=val, angle_name="pitch")
         self.pitch = val
         self.update_vectors()
 
     def set_roll(self, val: float):
-        "Set yaw value"
+        "Set roll value"
         self.check_angle(angle=val, angle_name="roll")
         self.roll = val
         self.update_vectors()
@@ -225,7 +225,7 @@ class PureRigid3dObject(AbstractRigid3dObject):
         "get model matrix"
         homcoord = self.position["x"], self.position["y"], self.position["z"], 1
         homocoord = list(homcoord)
-        idmat = self.rotation_matrix.copy()
+        idmat = self.idmat.copy()
         idmat = set_column_mat(-1, homocoord, idmat)
         return idmat
 
@@ -361,6 +361,11 @@ class QtRigid3dObject(AbstractRigid3dObject):
         self.idmat = QMatrix4x4()
         self.idmat.setToIdentity()
 
+    @classmethod
+    def rotate_matrix_on_axis(cls, axis: str, angle: float, mat: QMatrix4x4):
+        "rotate matrix on given axis using angle"
+        pass
+
     # overriding property
     @classmethod
     def make_rotation_matrix(cls, axis: str, angle: float):
@@ -389,9 +394,12 @@ class QtRigid3dObject(AbstractRigid3dObject):
         return rotmat * self.position
 
     def get_model_matrix(self):
-        vals = self.rotation_matrix.copyDataTo()
-        modelmat = QMatrix4x4(vals)
+        modelmat = QMatrix4x4()
+        modelmat.setToIdentity()
         modelmat.translate(self.position)
+        modelmat.rotate(self.roll, QVector3D(1.0, 0.0, 0.0))
+        modelmat.rotate(self.pitch, QVector3D(0.0, 1.0, 0.0))
+        modelmat.rotate(self.yaw, QVector3D(0.0, 0.0, 1.0))
         return modelmat
 
     def update_vectors(self):
