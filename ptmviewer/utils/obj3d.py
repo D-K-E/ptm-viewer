@@ -132,16 +132,19 @@ class AbstractRigid3dObject(ABC):
     def set_yaw(self, val: float):
         "Set yaw value"
         self.check_angle(angle=val, angle_name="yaw")
+        self.yaw = val
         self.update_vectors()
 
     def set_pitch(self, val: float):
         "Set yaw value"
         self.check_angle(angle=val, angle_name="pitch")
+        self.pitch = val
         self.update_vectors()
 
     def set_roll(self, val: float):
         "Set yaw value"
         self.check_angle(angle=val, angle_name="roll")
+        self.roll = val
         self.update_vectors()
 
     def __str__(self):
