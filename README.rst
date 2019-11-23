@@ -39,9 +39,9 @@ Milestone 0.1.0
 
 - [x] Reproducible lightening conditions using lightning parameter serialization
 
-- [x] Handle light and camera rotation in all axes.
+- [✓] Handle light and camera rotation in all axes.
 
-- [x] Handle light and camera movement in all axes.
+- [✓] Handle light and camera movement in all axes.
 
 - [✓] Small notepad for taking notes about the object as it is seen by the user.
 
