@@ -334,23 +334,23 @@ class AppWindowFinal(AppWindowMoveControl):
 
         ## move widget
         ### Available buttons
-        self.moveCameraRBtn.toggled.connect(lambda x: x)
-        self.moveLightRBtn.toggled.connect(lambda x: x)
-        self.moveXCBox.stateChanged.connect(lambda x: x)
-        self.moveYCBox.stateChanged.connect(lambda x: x)
-        self.moveZCBox.stateChanged.connect(lambda x: x)
+        # self.moveCameraRBtn.toggled.connect(lambda x: x)
+        # self.moveLightRBtn.toggled.connect(lambda x: x)
+        # self.moveXCBox.stateChanged.connect(lambda x: x)
+        # self.moveYCBox.stateChanged.connect(lambda x: x)
+        # self.moveZCBox.stateChanged.connect(lambda x: x)
         self.moveUp.clicked.connect(self.move_up_light_camera)
         self.moveDown.clicked.connect(self.move_down_light_camera)
         ## rotate widget
         ### Available buttons
-        self.rotCamRBtn.toggled.connect(lambda x: x)
-        self.rotLightRBtn.toggled.connect(lambda x: x)
+        # self.rotCamRBtn.toggled.connect(lambda x: x)
+        # self.rotLightRBtn.toggled.connect(lambda x: x)
         self.angleSpin.valueChanged.connect(self.set_angles)
         ## color widget
         ### Available buttons
-        self.ambientRBtn.toggled.connect(lambda x: x)
-        self.diffuseRBtn.toggled.connect(lambda x: x)
-        self.specularRBtn.toggled.connect(lambda x: x)
+        # self.ambientRBtn.toggled.connect(lambda x: x)
+        # self.diffuseRBtn.toggled.connect(lambda x: x)
+        # self.specularRBtn.toggled.connect(lambda x: x)
         self.intensityR.valueChanged.connect(self.set_red_intensity)
         self.intensityG.valueChanged.connect(self.set_green_intensity)
         self.intensityB.valueChanged.connect(self.set_blue_intensity)
@@ -368,15 +368,14 @@ class AppWindowFinal(AppWindowMoveControl):
 
         self.removeFile.clicked.connect(self.removeItems)
         ## shader widget
-        self.shinSpin.valueChanged.connect(lambda x: x)
 
         # viewer widget, opengl widgets with different shaders
         self.availableGlWidgets = {
             "Lambertian": PtmLambertianGLWidget,
             "SingleNormalMap": PtmNormalMapGLWidget,
-            # "PerChannelPhong": PtmPerChannelNormalMapPhongGLWidget,
+            "PerChannelPhong": PtmPerChannelNormalMapPhongGLWidget,
             "PerChannelNormalMapDir": PtmPerChannelNormalMapDirGLWidget,
-            # "PerChannelNormalMapPoint": PtmPerChannelNormalMapPointGLWidget,
+            "PerChannelNormalMapPoint": PtmPerChannelNormalMapPointGLWidget,
             # "PerChannelNormalMapSpot": PtmPerChannelNormalMapSpotGLWidget,
         }
         wnames = [k for k in self.availableGlWidgets.keys()]

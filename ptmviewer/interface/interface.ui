@@ -125,12 +125,18 @@
               <property name="text">
                <string>Diffuse</string>
               </property>
+              <property name="checked">
+               <bool>true</bool>
+              </property>
              </widget>
             </item>
             <item>
              <widget class="QRadioButton" name="specularRBtn">
               <property name="text">
                <string>Specular</string>
+              </property>
+              <property name="checked">
+               <bool>false</bool>
               </property>
              </widget>
             </item>
@@ -310,6 +316,9 @@
             <property name="text">
              <string>Rotate Light</string>
             </property>
+            <property name="checked">
+             <bool>true</bool>
+            </property>
            </widget>
           </item>
          </layout>
@@ -356,7 +365,7 @@
               <double>360.000000000000000</double>
              </property>
              <property name="singleStep">
-              <double>0.010000000000000</double>
+              <double>1.000000000000000</double>
              </property>
              <property name="value">
               <double>1.000000000000000</double>
@@ -399,6 +408,9 @@
              <widget class="QRadioButton" name="moveCameraRBtn">
               <property name="text">
                <string>Move Camera</string>
+              </property>
+              <property name="checked">
+               <bool>true</bool>
               </property>
              </widget>
             </item>

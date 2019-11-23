@@ -1142,7 +1142,7 @@ class PtmPerChannelNormalMapDirGLWidget(PtmPerChannelNormalMapGLWidget):
 
 
 class PtmPerChannelNormalMapPointGLWidget(PtmPerChannelNormalMapGLWidget):
-    "directional light normal mapping"
+    "point light normal mapping"
 
     def __init__(
         self,
