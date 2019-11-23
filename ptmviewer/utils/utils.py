@@ -34,7 +34,8 @@ def normalize_3col_array(arr):
 
 def get_vector_dot(arr1, arr2):
     "Get vector dot product for 2 matrices"
-    assert arr1.shape == arr2.shape
+    if arr1.shape != arr2.shape:
+        raise ValueError("arr1 and arr2 shape should be same")
     newarr = np.sum(arr1 * arr2, axis=1, dtype=np.float32)
     return newarr
 
@@ -42,7 +43,8 @@ def get_vector_dot(arr1, arr2):
 def get_matrix_to_vector_dot(mat: np.ndarray, vec: np.ndarray):
     "Get vector dot for each segment of matrix"
     mshape = mat[0, :].shape
-    assert mshape == vec.shape
+    if mshape != vec.shape:
+        raise ValueError("Matrix vector shape should be same with vector shape")
     d1 = get_vector_dot(mat[0, :], vec)
     d2 = get_vector_dot(mat[1, :], vec)
     d3 = get_vector_dot(mat[2, :], vec)
@@ -73,6 +75,13 @@ def getDistancePoint2Array(apoint, coordarr):
     xdist = (apoint.x - xarr) ** 2
     ydist = (apoint.y - yarr) ** 2
     return np.sqrt(xdist + ydist)
+
+
+def getInterpolationTable(arr: np.ndarray, mapRange: Tuple[float, float]) -> dict:
+    "Interpolate given one dimensional array into given range output as a table"
+    assert arr.ndim == 1
+    newarr = np.interp(arr, (arr.min(), arr.max()), mapRange)
+    return {arr[i]: newarr[i] for i in range(arr.size)}
 
 
 class ImageArray:
@@ -149,15 +158,25 @@ def vec2vecDot(vec1, vec2):
     return tuple(sum(v1 * v2 for v1, v2 in zip(vec1, vec2)))
 
 
-def sliceCol(colInd: int, matrix):
+def sliceCol(colInd: int, matrix: list):
     "slice column values from matrix"
     rownb = len(matrix)
     return [matrix[i, colInd] for i in range(rownb)]
 
 
-def mat2matDot(mat1: list, mat2: list):
+def set_column_mat(pos: int, arr: list, mat: list) -> list:
+    "set column to matrix at given position"
+    if len(mat) != len(arr):
+        raise ValueError("Col height not equal to size of array to insert")
+    for index, row in enumerate(mat):
+        row[pos] = arr[index]
+    return mat
+
+
+def mat2matDot(mat1: list, mat2: list) -> list:
     "Dot product in pure python"
-    assert len(mat1[0]) == len(mat2)
+    if len(mat1[0]) != len(mat2):
+        raise ValueError("mat1 row size is not equal mat2 column size")
     colnb = len(mat1[0])
     mat = []
     for rown in range(len(mat1)):
@@ -168,6 +187,17 @@ def mat2matDot(mat1: list, mat2: list):
             newmatRow.append(vec2vecDot(mat1Row, mat2col))
         mat.append(newmatRow)
     return mat
+
+
+def mat2vecDot(mat: list, vec: list) -> list:
+    "dot product in pure python matrix to vector"
+    if len(mat[0]) != len(vec):
+        raise ValueError("Matrix vector shape should be same with vector shape")
+    newmat = [[0 for i in range(len(mat[0]))] for k in range(len(mat))]
+    for i, row in enumerate(mat):
+        newrow = vec2vecDot(row, vec)
+        newmat = set_column_mat(pos=i, arr=newrow, mat=newmat)
+    return newmat
 
 
 def scalar2vecMult(vec, scalar):
@@ -209,7 +239,7 @@ def computePerspectiveQt(fieldOfView: float, aspect: float, zNear: float, zFar: 
     return mat.perspective(fieldOfView, aspect, zNear, zFar)
 
 
-def computeLookAtPure(pos: tuple, target: tuple, worldUp: tuple):
+def computeLookAtPure(pos: tuple, target: tuple, worldUp: tuple) -> list:
     ""
     assert len(pos) == 3 and len(target) == 3
     assert len(worldUp) == 3
@@ -301,11 +331,12 @@ def arr2qmat(arr: np.ndarray):
 def move3dObjPure(
     direction: str,
     positionVector: Tuple[float, float, float],
-    axvec1: Tuple[float, float, float],
-    axvec2: Tuple[float, float, float],
+    xaxis: Tuple[float, float, float],
+    yaxis: Tuple[float, float, float],
+    zaxis: Tuple[float, float, float],
     deltaTime: float,
     speed: float,
-    availableMoves=["forward", "backward", "left", "right"],
+    availableMoves=["+z", "-z", "-x", "+x", "+y", "-y"],
 ):
     ""
     velocity = speed * deltaTime
@@ -316,29 +347,37 @@ def move3dObjPure(
                 direction, availableMoves
             )
         )
-    if direction == "forward":
-        multip = scalar2vecMult(axvec1, velocity)
+    if direction == "+z":
+        multip = scalar2vecMult(zaxis, velocity)
         positionVector = vec2vecAdd(positionVector, multip)
-    elif direction == "backward":
-        multip = scalar2vecMult(axvec1, velocity)
+    elif direction == "-z":
+        multip = scalar2vecMult(zaxis, velocity)
         positionVector = vec2vecSubs(positionVector, multip)
-    elif direction == "right":
-        multip = scalar2vecMult(axvec2, velocity)
+    elif direction == "+x":
+        multip = scalar2vecMult(xaxis, velocity)
         positionVector = vec2vecAdd(positionVector, multip)
-    elif direction == "left":
-        multip = scalar2vecMult(axvec2, velocity)
+    elif direction == "-x":
+        multip = scalar2vecMult(xaxis, velocity)
         positionVector = vec2vecSubs(positionVector, multip)
+    elif direction == "+y":
+        multip = scalar2vecMult(yaxis, velocity)
+        positionVector = vec2vecAdd(positionVector, multip)
+    elif direction == "-y":
+        multip = scalar2vecMult(yaxis, velocity)
+        positionVector = vec2vecSubs(positionVector, multip)
+
     return positionVector
 
 
 def move3dObjQt(
     direction: str,
     positionVector: QVector3D,
-    axvec1: QVector3D,
-    axvec2: QVector3D,
+    xaxis: QVector3D,
+    yaxis: QVector3D,
+    zaxis: QVector3D,
     deltaTime: float,
     speed: float,
-    availableMoves=["forward", "backward", "left", "right"],
+    availableMoves=["+x", "-x", "+y", "-y", "+z", "-z"],
 ):
     ""
     velocity = speed * deltaTime
@@ -349,15 +388,18 @@ def move3dObjQt(
                 direction, availableMoves
             )
         )
-    if direction == "forward":
-        positionVector += axvec1 * velocity
-    elif direction == "backward":
-        positionVector -= axvec1 * velocity
-    elif direction == "right":
-        positionVector += axvec2 * velocity
-    elif direction == "left":
-        positionVector -= axvec2 * velocity
-
+    if direction == "+x":
+        positionVector += xaxis * velocity
+    elif direction == "-x":
+        positionVector -= xaxis * velocity
+    elif direction == "+y":
+        positionVector += yaxis * velocity
+    elif direction == "-y":
+        positionVector -= yaxis * velocity
+    elif direction == "+z":
+        positionVector += zaxis * velocity
+    elif direction == "-z":
+        positionVector -= zaxis * velocity
     return positionVector
 
 
