@@ -21,9 +21,7 @@ class RGBPTM(PTMFileParse):
         self.imheight = self.ptmfile["image_height"]
         self.imwidth = self.ptmfile["image_width"]
         self.coefficients = self.ptmfile["coeffarr"]
-        self.imcoeffs = self.coefficients.reshape(
-            (3, self.imheight * self.imwidth, 6)
-        )
+        self.imcoeffs = self.coefficients.reshape((3, self.imheight * self.imwidth, 6))
         self.normal = None
         self.image = None
 
@@ -55,14 +53,7 @@ class RGBPTM(PTMFileParse):
     def form_light_direction_mat(self, luvec, lvvec):
         "Form the light direction matrice"
         l_mat = np.array(
-            [
-                luvec ** 2,
-                lvvec ** 2,
-                lvvec * luvec,
-                luvec,
-                lvvec,
-                np.ones_like(lvvec),
-            ],
+            [luvec ** 2, lvvec ** 2, lvvec * luvec, luvec, lvvec, np.ones_like(lvvec),],
             dtype=np.float,
         )
         return l_mat.T
@@ -78,16 +69,13 @@ class RGBPTM(PTMFileParse):
         arr = channel_coeffarr.reshape((-1, 6))
         light_dir_mat = self.get_light_direction_matrix(arr)
         intensity = np.sum(arr * light_dir_mat, axis=1, dtype=np.float32)
-        intensity = np.squeeze(
-            intensity.reshape((self.imheight, self.imwidth, -1))
-        )
+        intensity = np.squeeze(intensity.reshape((self.imheight, self.imwidth, -1)))
         return intensity
 
     def form_surface_normal(self, luvec, lvvec):
         "Form surface normal matrice"
         normal = np.array(
-            [luvec, lvvec, np.sqrt(1 - luvec ** 2 - lvvec ** 2)],
-            dtype=np.float,
+            [luvec, lvvec, np.sqrt(1 - luvec ** 2 - lvvec ** 2)], dtype=np.float,
         )
         return np.transpose(normal, (1, 0))
 
@@ -112,6 +100,14 @@ class RGBPTM(PTMFileParse):
         self.normal = normals
         return
 
+    def interpolate_normal(self, normal: np.ndarray):
+        "interpolate normals"
+        normal = np.interp(normal, (normal.min(), normal.max()), (-1, 1))
+        normal = np.interp(normal, (normal.min(), normal.max()), (0, 255))
+        normalMap = normal.reshape((self.imheight, self.imwidth, 3))
+        nmap = normalMap.astype("uint8", copy=False)
+        return nmap
+
     def getChannelNormalMap(self, channel: str):
         "get normal map for surface normals per channel"
         channel = channel.lower()
@@ -122,10 +118,7 @@ class RGBPTM(PTMFileParse):
         elif channel == "b" or channel == "blue":
             normal = self.normal[2, :, :]
         nshape = normal.shape
-        normal = np.interp(normal, (normal.min(), normal.max()), (-1, 1))
-        normal = np.interp(normal, (normal.min(), normal.max()), (0, 255))
-        normalMap = normal.reshape((self.imheight, self.imwidth, 3))
-        nmap = normalMap.astype("uint8", copy=False)
+        nmap = self.interpolate_normal(normal)
         return Image.fromarray(nmap)
 
     def getNormalMaps(self):
@@ -186,9 +179,7 @@ class RGBPTM(PTMFileParse):
         vertices = vertices.reshape(rowsize, 21, 1)
         vertices[:, 2, 0] = 1.0
         vertices = vertices.reshape(rowsize, 21)
-        indices = np.array(
-            [i for i in range(rowsize)], dtype=c_uint
-        )
+        indices = np.array([i for i in range(rowsize)], dtype=c_uint)
 
         rcoeff = self.imcoeffs[0, :, :]
         gcoeff = self.imcoeffs[1, :, :]
