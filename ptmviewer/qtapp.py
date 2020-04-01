@@ -405,7 +405,6 @@ class AppWindowFinal(AppWindowMoveControl):
         cindex = self.fileList.indexFromItem(citem)
         ptmobj = self.ptmfiles[cindex]
         ptm = RGBPTM(ptmobj["path"])
-        pdb.set_trace()
         # vertices, indices = ptm.getVerticesAndSizeArr()
         glchoice = self.shaderCombo.currentText()
         #

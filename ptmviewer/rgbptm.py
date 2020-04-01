@@ -75,9 +75,9 @@ class RGBPTM(PTMFileParse):
     def form_surface_normal(self, luvec, lvvec):
         "Form surface normal matrice"
         normal = np.array(
-            [luvec, lvvec, np.sqrt(1 - luvec ** 2 - lvvec ** 2)], dtype=np.float,
+            [luvec, lvvec, np.sqrt(1 - (luvec ** 2) - (lvvec ** 2))], dtype=np.float,
         )
-        return np.transpose(normal, (1, 0))
+        return normal.T
 
     def get_surface_normal(self, coeffarr):
         """
@@ -102,8 +102,15 @@ class RGBPTM(PTMFileParse):
 
     def interpolate_normal(self, normal: np.ndarray):
         "interpolate normals"
-        normal = np.interp(normal, (normal.min(), normal.max()), (-1, 1))
-        normal = np.interp(normal, (normal.min(), normal.max()), (0, 255))
+        normal[:, 0] = np.interp(
+            normal[:, 0], (normal[:, 0].min(), normal[:, 0].max()), (0, 255)
+        )
+        normal[:, 1] = np.interp(
+            normal[:, 1], (normal[:, 1].min(), normal[:, 1].max()), (0, 255)
+        )
+        normal[:, 2] = np.interp(
+            normal[:, 2], (normal[:, 2].min(), normal[:, 2].max()), (0, 255)
+        )
         normalMap = normal.reshape((self.imheight, self.imwidth, 3))
         nmap = normalMap.astype("uint8", copy=False)
         return nmap
